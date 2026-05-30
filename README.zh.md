@@ -1,6 +1,14 @@
 # GitSparse (Web)
 
+<p align="center">
+  <img src="./gitsparse.png" alt="GitSparse Logo" width="120" />
+</p>
+
 一款 100% Web 客户端运行的 GitHub 仓库目录与特定文件精细化选择、下载及脚本生成工具。
+
+<p align="center">
+  <img src="./gitsparse.jpg" alt="GitSparse Screenshot" width="800" />
+</p>
 
 GitSparse 利用 GitHub REST API 在浏览器前端快速解析仓库文件树结构，支持 Glob 模式的高效过滤和高亮。用户可以通过复选框进行精细化的目录和文件多选，并一键生成包含 `curl` 命令的高内聚本地 Shell 脚本，把大型仓库的下载与同步压力彻底分散到本地终端，节约巨额的克隆带宽与本地磁盘空间。
 

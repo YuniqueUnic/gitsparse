@@ -1,6 +1,14 @@
-# GitSparse (Web) 
+# GitSparse (Web)
+
+<p align="center">
+  <img src="./gitsparse.png" alt="GitSparse Logo" width="120" />
+</p>
 
 A 100% web client-side tool for granular selection, downloading, and shell script generation for GitHub repository directories and specific files.
+
+<p align="center">
+  <img src="./gitsparse.jpg" alt="GitSparse Screenshot" width="800" />
+</p>
 
 GitSparse leverages the GitHub REST API to rapidly parse repository tree structures directly in the browser. It features high-performance Glob pattern filtering and highlighting, allowing users to precisely select directories and files via an IDE-style tree interface. With a single click, it generates high-cohesion local Shell scripts containing `curl` commands, offloading the download and synchronization pressure of large repositories to your local terminal—saving significant bandwidth and disk space.
 
