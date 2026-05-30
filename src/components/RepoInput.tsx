@@ -111,7 +111,7 @@ export function RepoInput({ onRepoSubmit, loading }: RepoInputProps) {
           </Button>
           {/* Right-top cute logo badge */}
           <div className="absolute -top-3.5 -right-2 z-[100] animate-bounce pointer-events-none select-none">
-            <img src="/logo.png" alt="logo" className="w-10 h-10 object-contain" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="logo" className="w-10 h-10 object-contain" />
           </div>
         </div>
       </form>

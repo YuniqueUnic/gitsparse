@@ -419,7 +419,7 @@ export default function App() {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="shrink-0 overflow-hidden rounded-xl">
-              <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain block" />
+              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-9 h-9 object-contain block" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
