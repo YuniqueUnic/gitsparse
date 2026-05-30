@@ -1,8 +1,12 @@
-# GitSparse (Web)
+<div align="center" style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+  <img src="https://signature4u.vercel.app/api/sign?text=GitSparse+Web&font=pacifico&fontSize=120&speed=6&charSpacing=0&borderRadius=5&cardPadding=24&fill=gradient&fill1=e4cebb&fill2=ff2e96&stroke=e4cebb&stroke2=ff2e96&strokeMode=gradient&strokeEnabled=1&bg=transparent&bgMode=solid&bg2=ffffff&texture=dots&texColor=8a8a8a&texSize=27&texThickness=3&texOpacity=0.1&useGlow=1&linkFillStroke=1&format=svg" width="520" />
+  <img src="./gitsparse.png" alt="GitSparse Logo" width="180" />
+</div>
 
-<p align="center">
-  <img src="./gitsparse.png" alt="GitSparse Logo" width="120" />
-</p>
+<h2 align="center">
+<a href="https://yuniqueunic.github.io/gitsparse/">Live Web</a>
+| <a href="https://github.com/yuniqueunic/gitsparse">GitHub</a>
+</h2>
 
 一款 100% Web 客户端运行的 GitHub 仓库目录与特定文件精细化选择、下载及脚本生成工具。
 
@@ -90,3 +94,7 @@ bunx playwright test
 
 1. **类型与构建检查**：`tsc && vite build`（或 `bun run build`）必须实现 **0 errors, 0 warnings**。
 2. **自动化测试套件**：`playwright test`（或 `bunx playwright test`）必须实现 **100% 测试通过**。
+
+## 链接
+
+* [Linux.do](https://linux.do)
