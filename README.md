@@ -6,6 +6,7 @@
 <h2 align="center">
 <a href="https://yuniqueunic.github.io/gitsparse/">Live Web</a>
 | <a href="https://github.com/yuniqueunic/gitsparse">GitHub</a>
+| <a href="./README.zh.md">中文</a>
 </h2>
 
 A 100% web client-side tool for granular selection, downloading, and shell script generation for GitHub repository directories and specific files.

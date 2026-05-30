@@ -6,6 +6,7 @@
 <h2 align="center">
 <a href="https://yuniqueunic.github.io/gitsparse/">Live Web</a>
 | <a href="https://github.com/yuniqueunic/gitsparse">GitHub</a>
+| <a href="./README.md">English</a>
 </h2>
 
 一款 100% Web 客户端运行的 GitHub 仓库目录与特定文件精细化选择、下载及脚本生成工具。
