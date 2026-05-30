@@ -1,0 +1,22 @@
+{
+  "logo_title": "GitSparse",
+  "tag_pro": "PRO",
+  "description": "Selective client-side folder downloads with Glob filtering",
+  "btn_configure_token": "Configure Token",
+  "btn_token_configured": "Token Configured",
+  "btn_github": "GitHub",
+  "btn_tips": "Tips",
+  "btn_apply": "Apply",
+  "btn_copy_script": "Copy Script",
+  "btn_copied": "Copied",
+  "btn_download_sh": "Download .sh",
+  "btn_load_repo": "Load Repository",
+  "placeholder_repo_url": "owner/repository or GitHub URL",
+  "status_fetching": "Fetching tree...",
+  "status_ready": "Workspace ready",
+  "status_awaiting": "Awaiting input",
+  "api_limit": "API Limit",
+  "resets_in": "Resets in",
+  "mins": "mins",
+  "matches": "Matches"
+}
