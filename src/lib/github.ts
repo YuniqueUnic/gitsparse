@@ -342,10 +342,10 @@ else
 fi
 
 git config core.sparseCheckout true
-git sparse-checkout init --cone
+git sparse-checkout init --no-cone
 
 # Set files to sparse-checkout
-git sparse-checkout set ${selectedPaths.map(p => `"${p}"`).join(" ")}
+git sparse-checkout set --no-cone ${selectedPaths.map(p => `"${p}"`).join(" ")}
 
 echo "Fetching branch '${branch}' using blobless filter..."
 git fetch --depth 1 --filter=blob:none origin "${branch}"
