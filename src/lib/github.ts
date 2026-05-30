@@ -198,16 +198,43 @@ export function generateDownloadScript(
   selectedPaths: string[],
   tool: 'curl' | 'wget' = 'curl'
 ): string {
-  const token = getStoredToken() || "";
   let script = `#!/bin/bash
+# ==============================================================================
+# GitSparse - Download Automation Script
+# ==============================================================================
+# [Security Note]
+# To download from private repositories or bypass GitHub API rate limits,
+# set the GITHUB_PAT environment variable in your terminal before running:
+#   export GITHUB_PAT="your_github_personal_access_token"
+# ==============================================================================
+
 OUTPUT_DIR="."
 `;
 
-  if (token) {
-    script += `GITHUB_PAT="\${GITHUB_PAT:-${token}}"\n\n`;
+  if (tool === 'wget') {
+    script += `
+# Setup Authorization Header safely using Bash arrays to prevent word splitting
+AUTH_HEADERS=()
+if [ -n "$GITHUB_PAT" ]; then
+  AUTH_HEADERS+=(--header="Authorization: token $GITHUB_PAT")
+elif [ -n "$GITHUB_TOKEN" ]; then
+  AUTH_HEADERS+=(--header="Authorization: token $GITHUB_TOKEN")
+fi
+`;
+  } else {
+    script += `
+# Setup Authorization Header safely using Bash arrays to prevent word splitting
+AUTH_HEADERS=()
+if [ -n "$GITHUB_PAT" ]; then
+  AUTH_HEADERS+=(-H "Authorization: token $GITHUB_PAT")
+elif [ -n "$GITHUB_TOKEN" ]; then
+  AUTH_HEADERS+=(-H "Authorization: token $GITHUB_TOKEN")
+fi
+`;
   }
 
-  script += `BYPASS_CONFIRM=false
+  script += `
+BYPASS_CONFIRM=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -o)
@@ -244,17 +271,9 @@ echo "Downloading files to $OUTPUT_DIR..."
       .replace('\${path}', encodedPath);
     
     if (tool === 'wget') {
-      if (token) {
-        script += `mkdir -p "$OUTPUT_DIR/$(dirname "${path}")" && wget --header="Authorization: token \$GITHUB_PAT" -O "$OUTPUT_DIR/${path}" "${url}"\n`;
-      } else {
-        script += `mkdir -p "$OUTPUT_DIR/$(dirname "${path}")" && wget -O "$OUTPUT_DIR/${path}" "${url}"\n`;
-      }
+      script += `mkdir -p "$OUTPUT_DIR/$(dirname "${path}")" && wget -O "$OUTPUT_DIR/${path}" "\${AUTH_HEADERS[@]}" "${url}"\n`;
     } else {
-      if (token) {
-        script += `curl -H "Authorization: token \$GITHUB_PAT" -L --create-dirs -o "$OUTPUT_DIR/${path}" "${url}"\n`;
-      } else {
-        script += `curl -L --create-dirs -o "$OUTPUT_DIR/${path}" "${url}"\n`;
-      }
+      script += `curl -L "\${AUTH_HEADERS[@]}" --create-dirs -o "$OUTPUT_DIR/${path}" "${url}"\n`;
     }
   }
 
@@ -267,12 +286,18 @@ export function generateGitSparseScript(
   branch: string,
   selectedPaths: string[]
 ): string {
-  const token = getStoredToken() || "";
   let script = `#!/bin/bash
-OUTPUT_DIR="."
-`;
+# ==============================================================================
+# GitSparse - High-Performance Sparse Checkout Script
+# ==============================================================================
+# [Security Note]
+# To download from private repositories or bypass GitHub API rate limits,
+# set the GITHUB_PAT environment variable in your terminal before running:
+#   export GITHUB_PAT="your_github_personal_access_token"
+# ==============================================================================
 
-  script += `BYPASS_CONFIRM=false
+OUTPUT_DIR="."
+BYPASS_CONFIRM=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -o)
@@ -301,11 +326,19 @@ echo "Initializing sparse-checkout in '$OUTPUT_DIR'..."
 mkdir -p "$OUTPUT_DIR"
 cd "$OUTPUT_DIR"
 
+# Setup remote URL dynamically with token if provided via GITHUB_PAT or GITHUB_TOKEN
+REMOTE_URL="https://github.com/${owner}/${repo}.git"
+if [ -n "$GITHUB_PAT" ]; then
+  REMOTE_URL="https://oauth2:\\$GITHUB_PAT@github.com/${owner}/${repo}.git"
+elif [ -n "$GITHUB_TOKEN" ]; then
+  REMOTE_URL="https://oauth2:\\$GITHUB_TOKEN@github.com/${owner}/${repo}.git"
+fi
+
 if [ ! -d ".git" ]; then
   git init
-  git remote add origin "https://${token ? `oauth2:${token}@` : ""}github.com/${owner}/${repo}.git"
+  git remote add origin "$REMOTE_URL"
 else
-  git remote set-url origin "https://${token ? `oauth2:${token}@` : ""}github.com/${owner}/${repo}.git"
+  git remote set-url origin "$REMOTE_URL"
 fi
 
 git config core.sparseCheckout true

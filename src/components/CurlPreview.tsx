@@ -109,7 +109,7 @@ export function CurlPreview({
 
   const downloadScript = (scriptContent: string) => {
     try {
-      const filename = downloadMode === "sparse" ? "gitsparse.sh" : "gitdownloader.sh";
+      const filename = "gitsparse.sh";
       const blob = new Blob([scriptContent], { type: "text/x-sh;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -270,7 +270,7 @@ export function CurlPreview({
       <CardContent className="flex-1 flex flex-col p-0 bg-black/95 dark:bg-black/90 min-h-0 overflow-auto rounded-b-lg">
         <div className="text-[10px] text-slate-500 uppercase tracking-widest font-mono p-3 border-b border-slate-800 shrink-0 flex items-center gap-1.5 bg-slate-950/40">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          {downloadMode === "sparse" ? "gitsparse.sh" : `gitdownloader.sh (${downloadTool})`} PREVIEW
+          {downloadMode === "sparse" ? "gitsparse.sh" : `gitsparse.sh (${downloadTool})`} PREVIEW
         </div>
         <div className="flex-grow min-h-0 p-4 select-text">
           <HighlightedBash code={scriptContent} />
