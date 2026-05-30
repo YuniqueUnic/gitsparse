@@ -161,8 +161,15 @@ export function generateFolderDownloadCommands(owner: string, repo: string, bran
 }
 
 export function filterTree(nodes: TreeNode[], pattern: string): TreeNode[] {
-  if (!pattern) return nodes;
-  const isMatch = pm(pattern, { dot: true });
+  if (!pattern.trim()) return nodes;
+
+  // Support comma-separated multi-patterns: "*.json, *.md" -> ["*.json", "*.md"]
+  const patterns = pattern.split(',').map(p => p.trim()).filter(Boolean);
+  if (patterns.length === 0) return nodes;
+
+  // Build matchers for each individual pattern
+  const matchers = patterns.map(p => pm(p, { dot: true }));
+  const isMatch = (path: string) => matchers.some(m => m(path));
 
   const recurse = (treeNodes: TreeNode[]): TreeNode[] => {
     const result: TreeNode[] = [];

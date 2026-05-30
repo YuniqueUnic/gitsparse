@@ -89,44 +89,65 @@ export default function App() {
   }, []);
 
   const autoReloadLastSession = async (repo: any) => {
+    // Step 1: Instantly restore tree from cache to avoid blank screen on refresh
+    const cachedTreeStr = localStorage.getItem("gitsparse_last_tree");
+    const targetRef = repo.branch || "main";
+
+    if (repo.refType === "commit" && repo.commitSha) {
+      setRefType("commit");
+      setCommitSha(repo.commitSha);
+    } else {
+      setRefType("branch");
+      setCommitSha("");
+    }
+    setCurrentRef(targetRef);
+
+    if (cachedTreeStr) {
+      try {
+        const cachedNodes = JSON.parse(cachedTreeStr);
+        if (Array.isArray(cachedNodes) && cachedNodes.length > 0) {
+          setRepoInfo({ owner: repo.owner, repo: repo.repo, branch: targetRef });
+          setTreeNodes(cachedNodes);
+          // Restore glob and checked paths immediately from cache
+          const lastGlob = localStorage.getItem("gitsparse_last_glob") || "";
+          if (lastGlob) setGlobPattern(lastGlob);
+          const lastCheckedStr = localStorage.getItem("gitsparse_last_checked");
+          if (lastCheckedStr) {
+            try {
+              const paths = JSON.parse(lastCheckedStr);
+              if (Array.isArray(paths)) setCheckedPaths(new Set(paths));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to parse cached tree:", err);
+      }
+    }
+
+    // Step 2: Silently refetch fresh tree in background
     setLoading(true);
     try {
-      const targetRef = repo.branch || "main";
-      if (repo.refType === "commit" && repo.commitSha) {
-        setRefType("commit");
-        setCommitSha(repo.commitSha);
-      } else {
-        setRefType("branch");
-        setCommitSha("");
-      }
-      
       const branchList = await fetchRepoBranches(repo.owner, repo.repo).catch(() => []);
-      setBranches(branchList.map(b => b.name));
-      setCurrentRef(targetRef);
+      setBranches(branchList.map((b: {name: string}) => b.name));
 
       const treeData = await fetchRepoTree(repo.owner, repo.repo, targetRef);
       const nodes = buildTreeStructure(treeData.tree);
       
-      setRepoInfo({
-        owner: repo.owner,
-        repo: repo.repo,
-        branch: targetRef
-      });
+      setRepoInfo({ owner: repo.owner, repo: repo.repo, branch: targetRef });
       setTreeNodes(nodes);
+      // Update cached tree with fresh data
+      localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
       updateRateLimit();
 
-      // Restore glob pattern and checked paths
+      // Re-apply glob pattern and checked paths after fresh fetch
       const lastGlob = localStorage.getItem("gitsparse_last_glob") || "";
-      if (lastGlob) {
-        setGlobPattern(lastGlob);
-      }
-      
+      if (lastGlob) setGlobPattern(lastGlob);
       const lastCheckedStr = localStorage.getItem("gitsparse_last_checked");
       if (lastCheckedStr) {
-        const paths = JSON.parse(lastCheckedStr);
-        if (Array.isArray(paths)) {
-          setCheckedPaths(new Set(paths));
-        }
+        try {
+          const paths = JSON.parse(lastCheckedStr);
+          if (Array.isArray(paths)) setCheckedPaths(new Set(paths));
+        } catch {}
       }
     } catch (err) {
       console.warn("Failed to auto-reload last session:", err);
@@ -192,7 +213,7 @@ export default function App() {
       });
       setTreeNodes(nodes);
       
-      // Save last session to localStorage
+      // Save last session and tree to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
         owner: repo.owner,
         repo: repo.repo,
@@ -200,6 +221,7 @@ export default function App() {
         refType,
         commitSha: refType === "commit" ? commitSha.trim() : ""
       }));
+      localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
       
       // Update rate limits on success
       updateRateLimit();
@@ -239,7 +261,7 @@ export default function App() {
       });
       setTreeNodes(nodes);
       
-      // Save last session to localStorage
+      // Save last session and tree to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
         owner: repoInfo.owner,
         repo: repoInfo.repo,
@@ -247,6 +269,7 @@ export default function App() {
         refType: "branch",
         commitSha: ""
       }));
+      localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
       
       updateRateLimit();
     } catch (error) {
@@ -279,7 +302,7 @@ export default function App() {
       });
       setTreeNodes(nodes);
       
-      // Save last session to localStorage
+      // Save last session and tree to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
         owner: repoInfo.owner,
         repo: repoInfo.repo,
@@ -287,6 +310,7 @@ export default function App() {
         refType: "commit",
         commitSha: sha
       }));
+      localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
       
       updateRateLimit();
     } catch (error) {

@@ -61,7 +61,7 @@ test.describe("GitHub Direct Downloader E2E Tests", () => {
       }
     );
 
-    // 4. Mock Repository Trees API (dev branch)
+    // 5. Mock Repository Trees API (dev branch - also used in TC-10 reload)
     await page.route(
       "https://api.github.com/repos/test-owner/test-repo/git/trees/dev?recursive=1",
       async (route) => {
@@ -72,6 +72,24 @@ test.describe("GitHub Direct Downloader E2E Tests", () => {
             sha: "dev-tree-sha",
             tree: [
               { path: "dev-file.txt", type: "blob", sha: "dev-f1", size: 500 }
+            ],
+            truncated: false,
+          }),
+        });
+      }
+    );
+
+    // 6. Mock Repository Trees API (commit SHA abc1234 - used in TC-11)
+    await page.route(
+      "https://api.github.com/repos/test-owner/test-repo/git/trees/abc1234?recursive=1",
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            sha: "abc1234",
+            tree: [
+              { path: "sha-pinned-file.txt", type: "blob", sha: "sha-f1", size: 300 }
             ],
             truncated: false,
           }),
@@ -306,7 +324,7 @@ test.describe("GitHub Direct Downloader E2E Tests", () => {
     // Verify input backfill
     await expect(page.locator("input[placeholder*='owner/repository']")).toHaveValue("test-owner/test-repo");
     
-    // Verify tree auto-loaded
+    // Verify tree auto-loaded (from cache or refetch)
     await expect(page.locator("text=src").first()).toBeVisible();
     await expect(page.locator("text=docs").first()).toBeVisible();
 
@@ -317,4 +335,80 @@ test.describe("GitHub Direct Downloader E2E Tests", () => {
     const restoredCheckbox = page.locator("div").filter({ has: page.locator("span.truncate:text-is('README.md')") }).locator("button[role='checkbox']").first();
     await expect(restoredCheckbox).toHaveAttribute("data-state", "checked");
   });
+
+  test("TC-09: Verify comma-separated multi-pattern Glob filtering", async ({ page }) => {
+    // 1. Load repo
+    await page.locator("input[placeholder*='owner/repository']").fill("test-owner/test-repo");
+    await page.getByRole("button", { name: "Load Repository" }).click();
+    await expect(page.locator("text=src")).toBeVisible();
+
+    // 2. Expand docs to expose README.md
+    await page.locator("text=docs").click();
+    await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
+
+    // 3. Enter comma-separated multi-pattern: match both src ts files AND md files
+    const globInput = page.locator("input[placeholder*='Filter files']");
+    await globInput.fill("src/*.ts,docs/*.md");
+
+    // 4. Verify .ts files visible (from src/)
+    await expect(page.locator("span.truncate:has-text('index.ts')").first()).toBeVisible();
+
+    // 5. Verify .md file also visible (README.md from docs/)
+    await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
+
+    // 6. Switch to single pattern - only .md - verify .ts hidden
+    await globInput.fill("docs/*.md");
+    await expect(page.locator("span.truncate:has-text('index.ts')")).not.toBeVisible();
+    await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
+
+    // 7. Switch back to multi-pattern with spaces (real user input): "src/*.ts, docs/*.md"
+    await globInput.fill("src/*.ts, docs/*.md");
+    await expect(page.locator("span.truncate:has-text('index.ts')").first()).toBeVisible();
+    await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
+  });
+
+  test("TC-10: Verify branch switch via dropdown reloads the tree", async ({ page }) => {
+    // 1. Load repo (defaults to main)
+    await page.locator("input[placeholder*='owner/repository']").fill("test-owner/test-repo");
+    await page.getByRole("button", { name: "Load Repository" }).click();
+    await expect(page.locator("text=src")).toBeVisible();
+
+    // 2. Switch branch to dev
+    const selectTrigger = page.locator("button:has-text('main')").first();
+    await selectTrigger.click();
+    const devOption = page.locator("div[role='option']:has-text('dev')");
+    await devOption.click();
+
+    // 3. Verify tree updated to dev branch content
+    await expect(page.locator("text=dev-file.txt")).toBeVisible();
+    await expect(page.locator("text=src")).not.toBeVisible();
+
+    // 4. Verify that session is saved - reload and check persistence
+    await page.reload();
+    await expect(page.locator("text=dev-file.txt")).toBeVisible();
+  });
+
+  test("TC-11: Verify commit SHA switch reloads the tree with SHA-pinned content", async ({ page }) => {
+    // 1. Load repo
+    await page.locator("input[placeholder*='owner/repository']").fill("test-owner/test-repo");
+    await page.getByRole("button", { name: "Load Repository" }).click();
+    await expect(page.locator("text=src")).toBeVisible();
+
+    // 2. Switch to Commit SHA tab
+    const shaTab = page.locator("button[role='tab']").filter({ hasText: /Commit SHA/i }).first();
+    await shaTab.click();
+
+    // 3. Enter a commit SHA
+    const shaInput = page.locator("input[placeholder*='Commit SHA']");
+    await shaInput.fill("abc1234");
+
+    // 4. Click the Apply button (not Enter keypress since it's a standalone button)
+    const applyBtn = page.getByRole("button", { name: /apply/i });
+    await applyBtn.click();
+
+    // 5. Verify sha-pinned-file.txt (from SHA mock) is visible, main tree hidden
+    await expect(page.locator("text=sha-pinned-file.txt")).toBeVisible();
+    await expect(page.locator("text=src")).not.toBeVisible();
+  });
 });
+
