@@ -53,7 +53,7 @@ export function SuggestDialog({ isOpen, onOpenChange, onSwitchMode }: SuggestDia
           <div className="flex gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-primary">
             <Zap className="h-5 w-5 shrink-0 mt-0.5" />
             <div className="text-xs">
-              <h4 className="font-semibold text-primary-foreground">{t("dialogs:suggest_rec_title")}</h4>
+              <h4 className="font-semibold text-foreground">{t("dialogs:suggest_rec_title")}</h4>
               <p className="text-muted-foreground mt-1 leading-relaxed">
                 {t("dialogs:suggest_rec_desc")}
               </p>
