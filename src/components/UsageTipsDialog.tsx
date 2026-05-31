@@ -10,7 +10,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/components/I18nProvider";
 
 interface UsageTipsDialogProps {
   open: boolean;
@@ -20,7 +22,6 @@ interface UsageTipsDialogProps {
 
 interface CodeSnippetProps {
   code: string;
-  language?: string;
   className?: string;
 }
 
@@ -61,7 +62,6 @@ interface TimelineStepProps {
   children: React.ReactNode;
   isLast?: boolean;
   badge?: string;
-  badgeVariant?: "default" | "secondary" | "outline";
 }
 
 function TimelineStep({
@@ -72,7 +72,6 @@ function TimelineStep({
   children,
   isLast,
   badge,
-  badgeVariant = "secondary",
 }: TimelineStepProps) {
   return (
     <div className="flex gap-4">
@@ -94,9 +93,9 @@ function TimelineStep({
             {title}
           </div>
           {badge && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-mono font-medium bg-muted/60 text-muted-foreground border-border">
+            <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
               {badge}
-            </span>
+            </Badge>
           )}
         </div>
         {description && (
@@ -109,6 +108,7 @@ function TimelineStep({
 }
 
 export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsDialogProps) {
+  const { t } = useTranslation();
   const isSparse = downloadMode === "sparse";
   const scriptName = "gitsparse.sh";
 
@@ -123,10 +123,16 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
             </div>
             <div>
               <DialogTitle className="text-base font-bold">
-                How to Use <code className="font-mono text-primary text-sm">{scriptName}</code>
+                {t("usage:title", { scriptName })
+                  .split(scriptName)
+                  .flatMap((part, i, arr) =>
+                    i < arr.length - 1
+                      ? [part, <code key={i} className="font-mono text-primary text-sm">{scriptName}</code>]
+                      : [part]
+                  )}
               </DialogTitle>
               <DialogDescription className="text-xs mt-0.5">
-                Step-by-step guide to run the downloaded shell script
+                {t("usage:subtitle")}
               </DialogDescription>
             </div>
           </div>
@@ -140,10 +146,10 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
                   : "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
               )}
             >
-              {isSparse ? "Git Sparse Mode" : "Direct HTTP Mode"}
+              {isSparse ? t("usage:mode_sparse") : t("usage:mode_direct")}
             </span>
             <span className="text-xs text-muted-foreground">
-              {isSparse ? "Uses git sparse-checkout" : "Uses curl / wget"}
+              {isSparse ? t("usage:mode_sparse_desc") : t("usage:mode_direct_desc")}
             </span>
           </div>
         </DialogHeader>
@@ -154,8 +160,8 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
           <TimelineStep
             step={1}
             icon={<FolderOpen className="w-4 h-4" />}
-            title="Locate the downloaded script"
-            description="Find gitsparse.sh in your downloads folder (usually ~/Downloads) and cd into that directory."
+            title={t("usage:step1_title")}
+            description={t("usage:step1_desc")}
           >
             <CodeSnippet code={`cd ~/Downloads\n# Or wherever you saved the file:\n# cd /path/to/folder`} />
           </TimelineStep>
@@ -164,8 +170,8 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
           <TimelineStep
             step={2}
             icon={<ShieldCheck className="w-4 h-4" />}
-            title="Make the script executable"
-            description="Grant execute permission to the script so your shell can run it."
+            title={t("usage:step2_title")}
+            description={t("usage:step2_desc")}
             badge="chmod +x"
           >
             <CodeSnippet code={`chmod +x ${scriptName}`} />
@@ -175,12 +181,12 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
           <TimelineStep
             step={3}
             icon={<Play className="w-4 h-4" />}
-            title="Run the script"
-            description={`Download files into the current directory. You will be prompted to confirm before downloading starts.`}
+            title={t("usage:step3_title")}
+            description={t("usage:step3_desc")}
           >
             <CodeSnippet code={`bash ./${scriptName}`} />
             <p className="text-[11px] text-muted-foreground mt-1.5 ml-0.5">
-              The script will print how many files will be downloaded and ask for confirmation.
+              {t("usage:step3_note")}
             </p>
           </TimelineStep>
 
@@ -188,8 +194,8 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
           <TimelineStep
             step={4}
             icon={<FolderOpen className="w-4 h-4" />}
-            title="Specify an output directory"
-            description={`Use the -o flag to download into a specific folder. The folder will be created if it doesn't exist.`}
+            title={t("usage:step4_title")}
+            description={t("usage:step4_desc")}
             badge="-o <dir>"
           >
             <CodeSnippet code={`bash ./${scriptName} -o ./my-downloads\n# Or an absolute path:\nbash ./${scriptName} -o /tmp/output`} />
@@ -199,8 +205,8 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
           <TimelineStep
             step={5}
             icon={<Play className="w-4 h-4" />}
-            title="Skip the confirmation prompt"
-            description="Use -y or --yes to bypass the interactive confirmation — useful in CI/CD pipelines or scripts."
+            title={t("usage:step5_title")}
+            description={t("usage:step5_desc")}
             badge="-y / --yes"
           >
             <CodeSnippet code={`bash ./${scriptName} -o ./output -y\n# Long form:\nbash ./${scriptName} -o ./output --yes`} />
@@ -210,11 +216,8 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
           <TimelineStep
             step={6}
             icon={<ShieldCheck className="w-4 h-4" />}
-            title="Access private repos or avoid rate limits"
-            description={
-              `Set your GitHub Personal Access Token (PAT) as an environment variable. ` +
-              `The script reads it automatically — never hardcode tokens in scripts.`
-            }
+            title={t("usage:step6_title")}
+            description={t("usage:step6_desc")}
             badge="GITHUB_PAT"
             isLast={!isSparse}
           >
@@ -222,7 +225,19 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
               code={`export GITHUB_PAT="ghp_your_token_here"\nbash ./${scriptName} -o ./output -y`}
             />
             <p className="text-[11px] text-muted-foreground mt-1.5 ml-0.5">
-              💡 Tip: Add the export to your <code className="font-mono">~/.zshrc</code> or <code className="font-mono">~/.bashrc</code> to persist it.
+              {t("usage:step6_note").split("~/.zshrc").flatMap((part, i, arr) =>
+                i < arr.length - 1
+                  ? [part, <code key={`zshrc-${i}`} className="font-mono">~/.zshrc</code>]
+                  : [part]
+              ).flatMap((node, i) =>
+                typeof node === "string"
+                  ? node.split("~/.bashrc").flatMap((part, j, arr) =>
+                      j < arr.length - 1
+                        ? [part, <code key={`bashrc-${i}-${j}`} className="font-mono">~/.bashrc</code>]
+                        : [part]
+                    )
+                  : [node]
+              )}
             </p>
           </TimelineStep>
 
@@ -231,22 +246,34 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
             <TimelineStep
               step={7}
               icon={<Info className="w-4 h-4" />}
-              title="Git Sparse mode prerequisites"
-              description="The Git Sparse script requires git ≥ 2.25. It will clone a blobless repo into the output directory and selectively checkout only your files."
+              title={t("usage:step7_title")}
+              description={t("usage:step7_desc")}
               isLast
             >
               <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3 space-y-1.5 text-xs text-muted-foreground">
                 <p className="flex items-start gap-1.5">
                   <span className="text-violet-400 shrink-0">•</span>
-                  <span>Requires <code className="font-mono text-foreground">git</code> installed (version ≥ 2.25).</span>
+                  <span>
+                    {t("usage:step7_req1").split("git").flatMap((part, i, arr) =>
+                      i < arr.length - 1
+                        ? [part, <code key={i} className="font-mono text-foreground">git</code>]
+                        : [part]
+                    )}
+                  </span>
                 </p>
                 <p className="flex items-start gap-1.5">
                   <span className="text-violet-400 shrink-0">•</span>
-                  <span>The output directory becomes a git repo — you can use <code className="font-mono text-foreground">git pull</code> later to update files.</span>
+                  <span>
+                    {t("usage:step7_req2").split("git pull").flatMap((part, i, arr) =>
+                      i < arr.length - 1
+                        ? [part, <code key={i} className="font-mono text-foreground">git pull</code>]
+                        : [part]
+                    )}
+                  </span>
                 </p>
                 <p className="flex items-start gap-1.5">
                   <span className="text-violet-400 shrink-0">•</span>
-                  <span>If only part of a directory was selected, unselected files inside it are automatically removed after checkout.</span>
+                  <span>{t("usage:step7_req3")}</span>
                 </p>
               </div>
               <CodeSnippet code={`# Verify git version\ngit --version\n\n# Expected: git version 2.25 or higher`} className="mt-2" />
@@ -257,7 +284,7 @@ export function UsageTipsDialog({ open, onOpenChange, downloadMode }: UsageTipsD
         {/* Footer */}
         <div className="px-6 py-4 border-t bg-card/40 flex justify-end">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Got it
+            {t("usage:btn_got_it")}
           </Button>
         </div>
       </DialogContent>

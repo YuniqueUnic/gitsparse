@@ -44,5 +44,7 @@
   "err_empty_url": "Please enter a GitHub repository URL",
   "err_invalid_url": "Invalid GitHub repository. Please enter either 'owner/repo' or 'https://github.com/owner/repo'",
   "err_failed_fetch": "Failed to fetch repository",
-  "placeholder_branch_label": "branch"
+  "placeholder_branch_label": "branch",
+  "toast_error_title": "Error Loading Repository",
+  "toast_error_token_hint": "Click the key icon in the top-right to add your GitHub Personal Access Token."
 }

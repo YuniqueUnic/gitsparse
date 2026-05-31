@@ -1,0 +1,36 @@
+{
+  "title": "How to Use {{scriptName}}",
+  "subtitle": "Step-by-step guide to run the downloaded shell script",
+  "mode_direct": "Direct HTTP Mode",
+  "mode_sparse": "Git Sparse Mode",
+  "mode_direct_desc": "Uses curl / wget",
+  "mode_sparse_desc": "Uses git sparse-checkout",
+
+  "step1_title": "Locate the downloaded script",
+  "step1_desc": "Find gitsparse.sh in your downloads folder (usually ~/Downloads) and cd into that directory.",
+
+  "step2_title": "Make the script executable",
+  "step2_desc": "Grant execute permission to the script so your shell can run it.",
+
+  "step3_title": "Run the script",
+  "step3_desc": "Download files into the current directory. You will be prompted to confirm before downloading starts.",
+  "step3_note": "The script will print how many files will be downloaded and ask for confirmation.",
+
+  "step4_title": "Specify an output directory",
+  "step4_desc": "Use the -o flag to download into a specific folder. The folder will be created if it doesn't exist.",
+
+  "step5_title": "Skip the confirmation prompt",
+  "step5_desc": "Use -y or --yes to bypass the interactive confirmation — useful in CI/CD pipelines or scripts.",
+
+  "step6_title": "Access private repos or avoid rate limits",
+  "step6_desc": "Set your GitHub Personal Access Token (PAT) as an environment variable. The script reads it automatically — never hardcode tokens in scripts.",
+  "step6_note": "💡 Tip: Add the export to your ~/.zshrc or ~/.bashrc to persist it.",
+
+  "step7_title": "Git Sparse mode prerequisites",
+  "step7_desc": "The Git Sparse script requires git ≥ 2.25. It will clone a blobless repo into the output directory and selectively checkout only your files.",
+  "step7_req1": "Requires git installed (version ≥ 2.25).",
+  "step7_req2": "The output directory becomes a git repo — you can use git pull later to update files.",
+  "step7_req3": "If only part of a directory was selected, unselected files inside it are automatically removed after checkout.",
+
+  "btn_got_it": "Got it"
+}

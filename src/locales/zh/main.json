@@ -44,5 +44,7 @@
   "err_empty_url": "请输入 GitHub 仓库地址",
   "err_invalid_url": "非法的 GitHub 仓库地址。请输入格式如 'owner/repo' 或完整链接",
   "err_failed_fetch": "获取仓库失败",
-  "placeholder_branch_label": "分支"
+  "placeholder_branch_label": "分支",
+  "toast_error_title": "仓库载入失败",
+  "toast_error_token_hint": "请点击右上角密钥图标，添加您的 GitHub 个人访问令牌（PAT）。"
 }

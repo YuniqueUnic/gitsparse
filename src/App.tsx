@@ -232,12 +232,20 @@ export default function App() {
       });
     } catch (error) {
       console.error("Error fetching repository:", error);
+      const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+      const needsToken = message.includes("403") || message.includes("401") || message.includes("429");
       toast({
         variant: "destructive",
-        title: "Error Loading Repository",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        title: t("main:toast_error_title"),
+        description: needsToken
+          ? `${message}\n\n→ ${t("main:toast_error_token_hint")}`
+          : message,
+        duration: needsToken ? 8000 : 5000,
       });
-      throw error;
+      // Auto-open token dialog on auth errors so users can immediately add their PAT
+      if (needsToken) {
+        setIsTokenOpen(true);
+      }
     } finally {
       setLoading(false);
     }

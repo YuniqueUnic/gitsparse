@@ -52,6 +52,25 @@ export function getStoredToken(): string | null {
   return null;
 }
 
+/** Translates GitHub API HTTP errors into actionable user-facing messages */
+function githubApiError(status: number, context: string): Error {
+  switch (status) {
+    case 401:
+      return new Error(`[401 Unauthorized] ${context} — your token is invalid or expired. Please update your GitHub Personal Access Token in the token settings.`);
+    case 403:
+      return new Error(`[403 Forbidden] ${context} — you have either hit the GitHub API rate limit or this repository requires a Personal Access Token. Add a GitHub PAT via the 🔑 token button to continue.`);
+    case 404:
+      return new Error(`[404 Not Found] ${context} — the repository or branch does not exist, or it is private. Check the URL, or add a GitHub PAT to access private repositories.`);
+    case 429:
+      return new Error(`[429 Too Many Requests] ${context} — GitHub API rate limit reached. Add a GitHub PAT (🔑) to get 5000 requests/hour instead of 60.`);
+    default:
+      if (status >= 500) {
+        return new Error(`[${status} Server Error] ${context} — GitHub API is temporarily unavailable. Please try again in a few seconds.`);
+      }
+      return new Error(`[${status}] ${context} — unexpected error from GitHub API.`);
+  }
+}
+
 export async function fetchRepoTree(owner: string, repo: string, branch = "main", token?: string): Promise<GitTreeResponse> {
   const actualToken = token || getStoredToken();
   const headers: Record<string, string> = {};
@@ -62,10 +81,7 @@ export async function fetchRepoTree(owner: string, repo: string, branch = "main"
     headers
   });
   if (!res.ok) {
-    if (res.status === 404) {
-      throw new Error("Repository not found. Please check the URL and make sure the repository is public or your token is valid.");
-    }
-    throw new Error(`Failed to fetch repository tree: ${res.statusText}`);
+    throw githubApiError(res.status, `Fetching tree for ${owner}/${repo}@${branch}`);
   }
   return res.json();
 }
@@ -468,7 +484,7 @@ export async function fetchRepoBranches(owner: string, repo: string, token?: str
   }
   const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`, { headers });
   if (!res.ok) {
-    throw new Error(`Failed to fetch branches: ${res.statusText}`);
+    throw githubApiError(res.status, `Fetching branches for ${owner}/${repo}`);
   }
   return res.json();
 }

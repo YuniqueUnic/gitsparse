@@ -7,10 +7,12 @@ import { createContext, useContext, useState, useEffect } from "react";
 import enCommon from "../locales/en/common.json";
 import enDialogs from "../locales/en/dialogs.json";
 import enMain from "../locales/en/main.json";
+import enUsage from "../locales/en/usage.json";
 
 import zhCommon from "../locales/zh/common.json";
 import zhDialogs from "../locales/zh/dialogs.json";
 import zhMain from "../locales/zh/main.json";
+import zhUsage from "../locales/zh/usage.json";
 
 export type Locale = "en" | "zh";
 
@@ -19,11 +21,13 @@ const translations = {
     common: enCommon,
     dialogs: enDialogs,
     main: enMain,
+    usage: enUsage,
   },
   zh: {
     common: zhCommon,
     dialogs: zhDialogs,
     main: zhMain,
+    usage: zhUsage,
   },
 } as const;
 

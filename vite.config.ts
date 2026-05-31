@@ -15,4 +15,12 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
+  test: {
+    environment: 'node',
+    globals: true,
+    include: ['src/**/*.unit.test.ts', 'src/**/*.unit.test.tsx'],
+    alias: {
+      '@/': path.resolve(__dirname, './src') + '/',
+    },
+  },
 });
