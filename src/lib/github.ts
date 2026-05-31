@@ -287,13 +287,107 @@ echo "Downloading files to $OUTPUT_DIR..."
   return script;
 }
 
+/**
+ * Compute optimal sparse-checkout paths from a selected file list and the full repository file list.
+ * Strategy:
+ *   - For each directory that appears in selectedPaths:
+ *     - If ALL files in that dir (from allRepoFiles) are selected → include the whole dir path
+ *     - If ONLY SOME files are selected → include the dir path AND record excluded files for post-checkout rm
+ *   - Root-level files (no parent dir) are included directly
+ *
+ * This collapses potentially thousands of file args into a small set of directory args,
+ * avoiding shell ARG_MAX limits and making the script human-readable.
+ */
+export function computeSparsePathsAndCleanup(
+  selectedPaths: string[],
+  allRepoFiles: string[]
+): { sparsePaths: string[]; filesToRemove: string[] } {
+  if (selectedPaths.length === 0) return { sparsePaths: [], filesToRemove: [] };
+
+  const selectedSet = new Set(selectedPaths);
+  // Group all repo files by their parent directory
+  const dirToAllFiles = new Map<string, string[]>();
+  for (const f of allRepoFiles) {
+    const slashIdx = f.lastIndexOf('/');
+    const dir = slashIdx === -1 ? '' : f.slice(0, slashIdx);
+    if (!dirToAllFiles.has(dir)) dirToAllFiles.set(dir, []);
+    dirToAllFiles.get(dir)!.push(f);
+  }
+
+  // Group selected files by their parent directory
+  const selectedByDir = new Map<string, string[]>();
+  for (const f of selectedPaths) {
+    const slashIdx = f.lastIndexOf('/');
+    const dir = slashIdx === -1 ? '' : f.slice(0, slashIdx);
+    if (!selectedByDir.has(dir)) selectedByDir.set(dir, []);
+    selectedByDir.get(dir)!.push(f);
+  }
+
+  const sparsePaths: string[] = [];
+  const filesToRemove: string[] = [];
+  const coveredDirs = new Set<string>();
+
+  for (const [dir, selected] of selectedByDir.entries()) {
+    const allInDir = dirToAllFiles.get(dir) || [];
+    const allSelected = allInDir.length > 0 && allInDir.every(f => selectedSet.has(f));
+
+    // Use top-level dir segment (e.g. "src" instead of "src/components/Button")
+    // to avoid deep path proliferation — git sparse-checkout covers the whole subtree
+    const topDir = dir === '' ? '' : dir.split('/')[0];
+
+    if (allSelected) {
+      // Full directory — just add the directory (no cleanup needed)
+      const pathToAdd = dir === '' ? null : dir;
+      if (pathToAdd && !coveredDirs.has(topDir)) {
+        sparsePaths.push(dir);
+        coveredDirs.add(dir);
+      } else if (dir === '') {
+        // Root files: add them individually
+        for (const f of selected) sparsePaths.push(f);
+      }
+    } else {
+      // Partial directory — checkout the parent dir, then rm unselected files
+      if (dir === '') {
+        // Root level: just add selected files directly (no dir to rm from)
+        for (const f of selected) sparsePaths.push(f);
+      } else {
+        if (!coveredDirs.has(dir)) {
+          sparsePaths.push(dir);
+          coveredDirs.add(dir);
+        }
+        // Files in this dir NOT selected must be removed after checkout
+        for (const f of allInDir) {
+          if (!selectedSet.has(f)) filesToRemove.push(f);
+        }
+      }
+    }
+  }
+
+  return { sparsePaths: [...new Set(sparsePaths)], filesToRemove: [...new Set(filesToRemove)] };
+}
+
 export function generateGitSparseScript(
   owner: string,
   repo: string,
   branch: string,
-  selectedPaths: string[]
+  selectedPaths: string[],
+  allRepoFiles: string[] = []
 ): string {
-  let script = `#!/bin/bash
+  const { sparsePaths, filesToRemove } = computeSparsePathsAndCleanup(selectedPaths, allRepoFiles);
+
+  // Fallback: if aggregation produced nothing useful, fall back to raw file list
+  const sparseArgs = sparsePaths.length > 0 ? sparsePaths : selectedPaths;
+
+  const removeBlock = filesToRemove.length > 0
+    ? `
+# Remove files not in your selection (directory was partially checked out)
+echo "Cleaning up unselected files..."
+${filesToRemove.map(f => `[ -f "${f}" ] && rm "${f}"`).join('\n')}
+# Remove any empty dirs left behind
+find . -type d -empty -not -name '.git' -not -path './.git/*' -delete 2>/dev/null || true`
+    : '';
+
+  return `#!/bin/bash
 # ==============================================================================
 # GitSparse - High-Performance Sparse Checkout Script
 # ==============================================================================
@@ -301,6 +395,9 @@ export function generateGitSparseScript(
 # To download from private repositories or bypass GitHub API rate limits,
 # set the GITHUB_PAT environment variable in your terminal before running:
 #   export GITHUB_PAT="your_github_personal_access_token"
+# ==============================================================================
+# Sparse paths : ${sparseArgs.length} (covering ${selectedPaths.length} files)
+# Files to rm  : ${filesToRemove.length} (partial directory cleanup)
 # ==============================================================================
 
 OUTPUT_DIR="."
@@ -351,17 +448,15 @@ fi
 git config core.sparseCheckout true
 git sparse-checkout init --no-cone
 
-# Set files to sparse-checkout
-git sparse-checkout set --no-cone ${selectedPaths.map(p => `"${p}"`).join(" ")}
+# Set paths to sparse-checkout (directories preferred over individual files)
+git sparse-checkout set --no-cone ${sparseArgs.map(p => `"${p}"`).join(' ')}
 
 echo "Fetching branch '${branch}' using blobless filter..."
 git fetch --depth 1 --filter=blob:none origin "${branch}"
 git checkout "${branch}"
-
+${removeBlock}
 echo "Sparse download completed successfully!"
 `;
-
-  return script;
 }
 
 

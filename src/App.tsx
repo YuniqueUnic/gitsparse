@@ -721,6 +721,7 @@ export default function App() {
             checkedPaths={checkedPaths}
             totalSize={totalSelectedSize}
             filesMap={filesMap}
+            allRepoFiles={allLeafFiles}
             downloadMode={downloadMode}
             setDownloadMode={setDownloadMode}
           />

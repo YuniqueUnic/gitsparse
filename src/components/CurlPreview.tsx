@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Check, Download, Terminal, AlertCircle, File, Folder } from "lucide-react";
+import { Copy, Check, Download, Terminal, AlertCircle, File, Folder, BookOpen } from "lucide-react";
 import { TreeNode, RepoInfo } from "@/lib/types";
 import { downloadCommand, getAllFiles, generateDownloadScript, generateGitSparseScript } from "@/lib/github";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "./I18nProvider";
+import { UsageTipsDialog } from "./UsageTipsDialog";
 
 interface CurlPreviewProps {
   selectedNode: TreeNode | null;
@@ -17,6 +17,7 @@ interface CurlPreviewProps {
   checkedPaths: Set<string>;
   totalSize: number;
   filesMap: Map<string, number>; // Flattened map to calculate sizes dynamically
+  allRepoFiles: string[]; // Full file list for directory-level sparse-checkout optimization
   downloadMode: "direct" | "sparse";
   setDownloadMode: (mode: "direct" | "sparse") => void;
 }
@@ -85,11 +86,13 @@ export function CurlPreview({
   checkedPaths,
   totalSize,
   filesMap,
+  allRepoFiles,
   downloadMode,
   setDownloadMode,
 }: CurlPreviewProps) {
   const [downloadTool, setDownloadTool] = useState<"curl" | "wget">("curl");
   const [copiedAll, setCopiedAll] = useState(false);
+  const [showUsageTips, setShowUsageTips] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -222,7 +225,7 @@ export function CurlPreview({
   if (!repoInfo) return null;
 
   const scriptContent = downloadMode === "sparse"
-    ? generateGitSparseScript(repoInfo.owner, repoInfo.repo, repoInfo.branch, selectedList)
+    ? generateGitSparseScript(repoInfo.owner, repoInfo.repo, repoInfo.branch, selectedList, allRepoFiles)
     : generateDownloadScript(repoInfo.owner, repoInfo.repo, repoInfo.branch, selectedList, downloadTool);
 
   const sizeStr =
@@ -264,7 +267,22 @@ export function CurlPreview({
               <Download className="w-3.5 h-3.5 mr-1" />
               {t("common:btn_download_sh")}
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowUsageTips(true)}
+              className="h-8 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
+              title="How to use this script"
+            >
+              <BookOpen className="w-3.5 h-3.5 mr-1" />
+              Usage
+            </Button>
           </div>
+          <UsageTipsDialog
+            open={showUsageTips}
+            onOpenChange={setShowUsageTips}
+            downloadMode={downloadMode}
+          />
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0 bg-black/95 dark:bg-black/90 min-h-0 overflow-auto rounded-b-lg">
