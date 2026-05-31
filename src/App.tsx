@@ -713,8 +713,10 @@ export default function App() {
                 onCheckChange={handleCheckChange}
                 onNodeSelect={(node) => {
                   handleNodeSelect(node);
-                  // Auto-switch to preview tab on mobile when a file/folder is clicked
-                  setMobileTab("preview");
+                  // Auto-switch to preview tab on mobile when a file is clicked (not folder expansion)
+                  if (node.type === "blob") {
+                    setMobileTab("preview");
+                  }
                 }}
                 selectedPath={selectedNode?.path}
               />

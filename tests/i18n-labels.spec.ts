@@ -19,7 +19,7 @@ import {
 // ---------------------------------------------------------------------------
 const LOCALE_KEY = "gitsparse_locale";
 
-test.describe("Feature: i18n button labels and preview tag", () => {
+test.describe("Feature: i18n button labels and preview tag (English)", () => {
   test.beforeEach(async ({ page }) => {
     await setupMocks(page);
     await page.goto("/");
@@ -46,27 +46,6 @@ test.describe("Feature: i18n button labels and preview tag", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Scenario: Usage button renders localised text in Chinese
-  // -------------------------------------------------------------------------
-  test("Scenario: Usage button renders localised text in Chinese (ZH)", async ({ page }) => {
-    // Given the locale is set to Chinese before navigation
-    await page.addInitScript((key) => {
-      localStorage.setItem(key, "zh");
-    }, LOCALE_KEY);
-
-    // And a repo is loaded and a file is selected
-    await loadRepo(page);
-    await selectReadmeMd(page);
-
-    // When I look at the action buttons in the script preview panel
-    const usageBtn = page.getByRole("button", { name: /使用说明/ });
-
-    // Then the Usage button shows the Chinese label
-    await expect(usageBtn).toBeVisible();
-    await expect(usageBtn).toContainText("使用说明");
-  });
-
-  // -------------------------------------------------------------------------
   // Scenario: PREVIEW label is rendered through i18n (English)
   // -------------------------------------------------------------------------
   test("Scenario: PREVIEW terminal label is rendered via i18n in English", async ({ page }) => {
@@ -81,25 +60,6 @@ test.describe("Feature: i18n button labels and preview tag", () => {
     await expect(previewBar).toContainText("PREVIEW");
     // And it is NOT just a hardcoded empty string or missing
     await expect(previewBar).not.toBeEmpty();
-  });
-
-  // -------------------------------------------------------------------------
-  // Scenario: PREVIEW label renders in Chinese
-  // -------------------------------------------------------------------------
-  test("Scenario: PREVIEW terminal label renders as '预览' in Chinese", async ({ page }) => {
-    // Given the locale is Chinese
-    await page.addInitScript((key) => {
-      localStorage.setItem(key, "zh");
-    }, LOCALE_KEY);
-
-    await loadRepo(page);
-    await selectReadmeMd(page);
-
-    // When I look at the terminal header bar
-    const previewBar = page.locator("div.uppercase.tracking-widest");
-
-    // Then it shows the Chinese label
-    await expect(previewBar).toContainText("预览");
   });
 
   // -------------------------------------------------------------------------
@@ -136,16 +96,57 @@ test.describe("Feature: i18n button labels and preview tag", () => {
     // And the close button uses i18n
     await expect(dialog.getByRole("button", { name: "Got it" })).toBeVisible();
   });
+});
+
+// ---------------------------------------------------------------------------
+// Chinese locale tests — addInitScript MUST be called before page.goto
+// ---------------------------------------------------------------------------
+test.describe("Feature: i18n button labels and preview tag (Chinese)", () => {
+  test.beforeEach(async ({ page }) => {
+    // Set Chinese locale BEFORE navigating so I18nProvider reads it on init
+    await page.addInitScript((key) => {
+      localStorage.setItem(key, "zh");
+    }, LOCALE_KEY);
+    await setupMocks(page);
+    await page.goto("/");
+  });
+
+  // -------------------------------------------------------------------------
+  // Scenario: Usage button renders localised text in Chinese
+  // -------------------------------------------------------------------------
+  test("Scenario: Usage button renders localised text in Chinese (ZH)", async ({ page }) => {
+    // Given a repo is loaded and a file is selected
+    await loadRepo(page);
+    await selectReadmeMd(page);
+
+    // When I look at the action buttons in the script preview panel
+    const usageBtn = page.getByRole("button", { name: /使用说明/ });
+
+    // Then the Usage button shows the Chinese label
+    await expect(usageBtn).toBeVisible();
+    await expect(usageBtn).toContainText("使用说明");
+  });
+
+  // -------------------------------------------------------------------------
+  // Scenario: PREVIEW label renders in Chinese
+  // -------------------------------------------------------------------------
+  test("Scenario: PREVIEW terminal label renders as '预览' in Chinese", async ({ page }) => {
+    // Given a repo is loaded and a file is selected
+    await loadRepo(page);
+    await selectReadmeMd(page);
+
+    // When I look at the terminal header bar
+    const previewBar = page.locator("div.uppercase.tracking-widest");
+
+    // Then it shows the Chinese label
+    await expect(previewBar).toContainText("预览");
+  });
 
   // -------------------------------------------------------------------------
   // Scenario: Usage dialog close button is i18n-aware in Chinese
   // -------------------------------------------------------------------------
   test("Scenario: Usage dialog close button shows '知道了' in Chinese", async ({ page }) => {
-    // Given the locale is Chinese
-    await page.addInitScript((key) => {
-      localStorage.setItem(key, "zh");
-    }, LOCALE_KEY);
-
+    // Given a repo is loaded and a file is selected
     await loadRepo(page);
     await selectReadmeMd(page);
 

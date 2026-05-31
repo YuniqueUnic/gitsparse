@@ -65,18 +65,17 @@ test.describe("Feature: GitHub 403 error triggers automatic Token dialog", () =>
   // Scenario: 403 toast message guides user to add token (ZH)
   // -------------------------------------------------------------------------
   test("Scenario: Error toast contains PAT guidance in Chinese locale", async ({ page }) => {
-    // Given the locale is Chinese
+    // Given the locale is Chinese — addInitScript must run before goto
     await page.addInitScript(() => localStorage.setItem("gitsparse_locale", "zh"));
-
-    // And 403 mocks are active
     await setup403Mocks(page);
+    await page.goto("/");
 
     // When I load a repo
     await loadRepo(page);
 
     // Then the toast title is in Chinese
-    const toastTitle = page.locator("[data-state='open'] [class*='title'], [data-state='open'] h2").first();
-    await expect(toastTitle).toContainText(/仓库|失败|Error/i, { timeout: 6000 });
+    const toast = page.locator("[data-state='open'][class*='destructive']").first();
+    await expect(toast).toContainText(/仓库|失败|Error/i, { timeout: 6000 });
   });
 
   // -------------------------------------------------------------------------

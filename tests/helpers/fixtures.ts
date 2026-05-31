@@ -124,8 +124,8 @@ export async function setup403Mocks(page: Page) {
 // Helper: load a repo via the input form
 // ==============================================================================
 export async function loadRepo(page: Page, repo = "test-owner/test-repo") {
-  await page.locator("input[placeholder*='owner/repository']").fill(repo);
-  await page.getByRole("button", { name: "Load Repository" }).click();
+  await page.locator("input[placeholder*='owner'], input[placeholder*='用户名']").fill(repo);
+  await page.locator("button[type='submit']").click();
 }
 
 // ==============================================================================
