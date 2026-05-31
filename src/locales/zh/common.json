@@ -18,5 +18,8 @@
   "api_limit": "API 限额",
   "resets_in": "重置于",
   "mins": "分钟后",
+  "btn_usage": "使用说明",
+  "btn_usage_title": "如何使用此脚本",
+  "preview_label": "预览",
   "matches": "匹配数"
 }

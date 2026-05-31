@@ -46,5 +46,6 @@
   "err_failed_fetch": "Failed to fetch repository",
   "placeholder_branch_label": "branch",
   "toast_error_title": "Error Loading Repository",
-  "toast_error_token_hint": "Click the key icon in the top-right to add your GitHub Personal Access Token."
+  "toast_error_token_hint": "Click the key icon in the top-right to add your GitHub Personal Access Token.",
+  "mobile_preview_tab": "Preview"
 }

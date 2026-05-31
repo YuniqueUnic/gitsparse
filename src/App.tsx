@@ -8,13 +8,12 @@ import { TipsDialog } from "@/components/TipsDialog";
 import { SuggestDialog } from "@/components/SuggestDialog";
 import { RepoInfo, TreeNode, RateLimit } from "@/lib/types";
 import { fetchRepoTree, buildTreeStructure, filterTree, fetchRateLimit, fetchRepoBranches, getStoredToken } from "@/lib/github";
-import { KeyRound, Menu, AlertCircle, Info, Database, Layers, CheckSquare, Square, HelpCircle } from "lucide-react";
+import { KeyRound, AlertCircle, Info, Database, Layers, CheckSquare, Square, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
@@ -51,6 +50,9 @@ export default function App() {
 
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  // Mobile view: tab switcher between Tree and Preview panels
+  const [mobileTab, setMobileTab] = useState<"tree" | "preview">("tree");
 
   // Monitor checked files to prompt switching to Git Sparse Mode dynamically
   useEffect(() => {
@@ -529,7 +531,7 @@ export default function App() {
           <RepoInput onRepoSubmit={handleRepoSubmit} loading={loading} />
 
           {repoInfo && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
               {/* Branch / Commit Switcher */}
               <div className="bg-card/45 p-2.5 rounded-lg border border-border space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
@@ -624,10 +626,42 @@ export default function App() {
         </div>
       </section>
 
-      {/* Main Workspace (IDE View Locked Single Screen) */}
-      <main className="flex-1 min-h-0 container mx-auto px-4 py-4 flex flex-col md:flex-row gap-4 overflow-hidden box-border">
-        {/* Left Side: Tree view */}
-        <section className="w-full h-[40%] md:h-full md:w-[35%] lg:w-[30%] bg-card/30 border border-border rounded-lg flex flex-col min-h-0 shrink-0 shadow-inner">
+      {/* Main Workspace — responsive: tabs on mobile, side-by-side on md+ */}
+      <main className="flex-1 min-h-0 container mx-auto px-4 py-3 flex flex-col min-h-0 box-border overflow-hidden">
+        {/* Mobile Tab Switcher — only visible on < md */}
+        <div className="flex md:hidden shrink-0 mb-3 gap-1 p-1 rounded-lg bg-muted/60 border border-border/60">
+          <button
+            onClick={() => setMobileTab("tree")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              mobileTab === "tree"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t("main:tree_title")}
+          </button>
+          <button
+            onClick={() => setMobileTab("preview")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              mobileTab === "preview"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t("main:mobile_preview_tab")}
+          </button>
+        </div>
+
+        {/* Content area */}
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 overflow-hidden">
+          {/* Left Side: Tree view */}
+          <section
+            className={`
+              bg-card/30 border border-border rounded-lg flex flex-col min-h-0 shrink-0 shadow-inner
+              md:w-[35%] lg:w-[30%] md:h-full
+              ${mobileTab === "tree" ? "flex flex-1" : "hidden"} md:flex
+            `}
+          >
           <div className="p-3 border-b border-border/80 bg-card/45 flex items-center justify-between gap-2 shrink-0">
             <div>
               <h2 className="font-bold text-sm text-foreground">{t("main:tree_title")}</h2>
@@ -664,34 +698,6 @@ export default function App() {
                     <Square className="w-4 h-4" />
                   </Button>
                 )}
-                {/* Mobile Drawer Trigger */}
-                <div className="md:hidden">
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
-                        <Menu className="w-4 h-4" />
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="bg-background border-r border-border text-foreground p-0 w-80 flex flex-col h-full">
-                      <SheetHeader className="p-4 border-b border-border shrink-0">
-                        <SheetTitle className="text-foreground flex items-center gap-2">
-                          <GithubBrand className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                          <span>{t("main:mobile_tree_title")}</span>
-                        </SheetTitle>
-                      </SheetHeader>
-                      <div className="flex-1 overflow-y-auto min-h-0 p-2">
-                        <TreeView
-                          nodes={filteredNodes}
-                          repoInfo={repoInfo!}
-                          checkedPaths={checkedPaths}
-                          onCheckChange={handleCheckChange}
-                          onNodeSelect={handleNodeSelect}
-                          selectedPath={selectedNode?.path}
-                        />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                </div>
               </div>
             )}
           </div>
@@ -705,7 +711,11 @@ export default function App() {
                 repoInfo={repoInfo}
                 checkedPaths={checkedPaths}
                 onCheckChange={handleCheckChange}
-                onNodeSelect={handleNodeSelect}
+                onNodeSelect={(node) => {
+                  handleNodeSelect(node);
+                  // Auto-switch to preview tab on mobile when a file/folder is clicked
+                  setMobileTab("preview");
+                }}
                 selectedPath={selectedNode?.path}
               />
             ) : (
@@ -721,19 +731,25 @@ export default function App() {
           </div>
         </section>
 
-        {/* Right Side: Command preview (Locked single screen height) */}
-        <section className="flex-1 h-[60%] md:h-full min-h-0 flex flex-col overflow-hidden">
-          <CurlPreview
-            selectedNode={selectedNode}
-            repoInfo={repoInfo}
-            checkedPaths={checkedPaths}
-            totalSize={totalSelectedSize}
-            filesMap={filesMap}
-            allRepoFiles={allLeafFiles}
-            downloadMode={downloadMode}
-            setDownloadMode={setDownloadMode}
-          />
-        </section>
+          {/* Right Side: Command preview */}
+          <section
+            className={`
+              flex-1 min-h-0 flex flex-col overflow-hidden
+              ${mobileTab === "preview" ? "flex flex-1" : "hidden"} md:flex
+            `}
+          >
+            <CurlPreview
+              selectedNode={selectedNode}
+              repoInfo={repoInfo}
+              checkedPaths={checkedPaths}
+              totalSize={totalSelectedSize}
+              filesMap={filesMap}
+              allRepoFiles={allLeafFiles}
+              downloadMode={downloadMode}
+              setDownloadMode={setDownloadMode}
+            />
+          </section>
+        </div>
       </main>
 
       {/* Footer Status Bar */}

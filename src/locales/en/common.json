@@ -18,5 +18,8 @@
   "api_limit": "API Limit",
   "resets_in": "Resets in",
   "mins": "mins",
+  "btn_usage": "Usage",
+  "btn_usage_title": "How to use this script",
+  "preview_label": "PREVIEW",
   "matches": "Matches"
 }
