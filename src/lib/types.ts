@@ -44,3 +44,9 @@ export interface RateLimitResponse {
   };
   rate: RateLimit;
 }
+
+export interface ApiResponse<T> {
+  data: T;
+  rateLimit?: RateLimit;
+  etag?: string;
+}

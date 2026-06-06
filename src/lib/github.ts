@@ -1,5 +1,17 @@
 import pm from 'picomatch';
-import { GitTreeResponse, TreeNode, RepoInfo, RateLimitResponse } from './types';
+import { GitTreeResponse, TreeNode, RepoInfo, RateLimitResponse, RateLimit, ApiResponse } from './types';
+
+// In-flight request cache for deduplication
+const inflightRequests = new Map<string, Promise<any>>();
+
+export function dedupedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  if (inflightRequests.has(key)) {
+    return inflightRequests.get(key)!;
+  }
+  const promise = fetcher().finally(() => inflightRequests.delete(key));
+  inflightRequests.set(key, promise);
+  return promise;
+}
 
 export function parseGitHubUrl(url: string, branch: string): RepoInfo | null {
   try {
@@ -52,6 +64,19 @@ export function getStoredToken(): string | null {
   return null;
 }
 
+/** Extract rate limit information from GitHub API response headers.
+ *  Returns null when X-RateLimit headers are absent (e.g. proxied/cached
+ *  responses or test environments where route.fulfill doesn't forward headers). */
+function extractRateLimit(res: Response): RateLimit | null {
+  const remaining = res.headers.get('X-RateLimit-Remaining');
+  if (remaining === null) return null;
+  return {
+    limit: Number(res.headers.get('X-RateLimit-Limit')) || 60,
+    remaining: Number(remaining),
+    reset: Number(res.headers.get('X-RateLimit-Reset')) || 0,
+  };
+}
+
 /** Translates GitHub API HTTP errors into actionable user-facing messages */
 function githubApiError(status: number, context: string): Error {
   switch (status) {
@@ -71,19 +96,35 @@ function githubApiError(status: number, context: string): Error {
   }
 }
 
-export async function fetchRepoTree(owner: string, repo: string, branch = "main", token?: string): Promise<GitTreeResponse> {
+export async function fetchRepoTree(owner: string, repo: string, branch = "main", token?: string, etag?: string): Promise<ApiResponse<GitTreeResponse | null>> {
   const actualToken = token || getStoredToken();
   const headers: Record<string, string> = {};
   if (actualToken) {
     headers['Authorization'] = `token ${actualToken}`;
   }
+  if (etag) {
+    headers['If-None-Match'] = etag;
+  }
   const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, {
     headers
   });
+  if (res.status === 304) {
+    return {
+      data: null,
+      rateLimit: extractRateLimit(res) ?? undefined,
+      etag,
+    };
+  }
   if (!res.ok) {
     throw githubApiError(res.status, `Fetching tree for ${owner}/${repo}@${branch}`);
   }
-  return res.json();
+  const data = await res.json();
+  const newEtag = res.headers.get('ETag') || undefined;
+  return {
+    data,
+    rateLimit: extractRateLimit(res) ?? undefined,
+    etag: newEtag,
+  };
 }
 
 export async function fetchRateLimit(token?: string): Promise<RateLimitResponse> {
@@ -476,7 +517,7 @@ echo "Sparse download completed successfully!"
 }
 
 
-export async function fetchRepoBranches(owner: string, repo: string, token?: string): Promise<{ name: string }[]> {
+export async function fetchRepoBranches(owner: string, repo: string, token?: string): Promise<ApiResponse<{ name: string }[]>> {
   const actualToken = token || getStoredToken();
   const headers: Record<string, string> = {};
   if (actualToken) {
@@ -486,5 +527,9 @@ export async function fetchRepoBranches(owner: string, repo: string, token?: str
   if (!res.ok) {
     throw githubApiError(res.status, `Fetching branches for ${owner}/${repo}`);
   }
-  return res.json();
+  const data = await res.json();
+  return {
+    data,
+    rateLimit: extractRateLimit(res) ?? undefined,
+  };
 }

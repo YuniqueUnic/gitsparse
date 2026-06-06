@@ -7,8 +7,8 @@ import { TokenDialog } from "@/components/TokenDialog";
 import { TipsDialog } from "@/components/TipsDialog";
 import { SuggestDialog } from "@/components/SuggestDialog";
 import { RepoInfo, TreeNode, RateLimit } from "@/lib/types";
-import { fetchRepoTree, buildTreeStructure, filterTree, fetchRateLimit, fetchRepoBranches, getStoredToken } from "@/lib/github";
-import { KeyRound, AlertCircle, Info, Database, Layers, CheckSquare, Square, HelpCircle } from "lucide-react";
+import { fetchRepoTree, buildTreeStructure, filterTree, fetchRepoBranches, getStoredToken, dedupedFetch } from "@/lib/github";
+import { KeyRound, Info, Database, Layers, CheckSquare, Square, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,8 +68,9 @@ export default function App() {
   useEffect(() => {
     const token = getStoredToken();
     setHasToken(!!token);
-    updateRateLimit(token || undefined);
-    
+    // Note: Rate limit is obtained from API response headers (X-RateLimit-*),
+    // no need to call /rate_limit endpoint on every page load.
+
     // Auto-restore last session
     const lastRepoStr = localStorage.getItem("gitsparse_last_repo");
     if (lastRepoStr) {
@@ -82,12 +83,6 @@ export default function App() {
         console.warn("Failed to parse last session repo:", err);
       }
     }
-
-    // Periodically update rate limit
-    const interval = setInterval(() => {
-      updateRateLimit();
-    }, 60000);
-    return () => clearInterval(interval);
   }, []);
 
   const autoReloadLastSession = async (repo: any) => {
@@ -126,30 +121,79 @@ export default function App() {
       }
     }
 
-    // Step 2: Silently refetch fresh tree in background
+    // Step 2: Restore branches from cache first
+    const branchesKey = `gitsparse_branches_${repo.owner}_${repo.repo}`;
+    const cachedBranchesStr = localStorage.getItem(branchesKey);
+    if (cachedBranchesStr) {
+      try {
+        const cachedBranches = JSON.parse(cachedBranchesStr);
+        if (Array.isArray(cachedBranches) && cachedBranches.length > 0) {
+          setBranches(cachedBranches);
+        }
+      } catch {}
+    }
+
+    // Step 3: Silently refetch in background
+    // Strategy: Use ETag for tree first. If 304 (not modified), skip branches fetch too.
+    // Only fetch branches when tree changed (new commits) or no cache exists.
+    const hasCachedBranches = !!cachedBranchesStr;
     setLoading(true);
     try {
-      const branchList = await fetchRepoBranches(repo.owner, repo.repo).catch(() => []);
-      setBranches(branchList.map((b: {name: string}) => b.name));
+      // Always try tree with ETag first (cheapest check)
+      const etagKey = `gitsparse_etag_${repo.owner}_${repo.repo}_${targetRef}`;
+      const storedEtag = localStorage.getItem(etagKey) || undefined;
 
-      const treeData = await fetchRepoTree(repo.owner, repo.repo, targetRef);
-      const nodes = buildTreeStructure(treeData.tree);
-      
-      setRepoInfo({ owner: repo.owner, repo: repo.repo, branch: targetRef });
-      setTreeNodes(nodes);
-      // Update cached tree with fresh data
-      localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
-      updateRateLimit();
+      const treeResult = await dedupedFetch(
+        `tree:${repo.owner}:${repo.repo}:${targetRef}`,
+        () => fetchRepoTree(repo.owner, repo.repo, targetRef, undefined, storedEtag)
+      );
 
-      // Re-apply glob pattern and checked paths after fresh fetch
-      const lastGlob = localStorage.getItem("gitsparse_last_glob") || "";
-      if (lastGlob) setGlobPattern(lastGlob);
-      const lastCheckedStr = localStorage.getItem("gitsparse_last_checked");
-      if (lastCheckedStr) {
-        try {
-          const paths = JSON.parse(lastCheckedStr);
-          if (Array.isArray(paths)) setCheckedPaths(new Set(paths));
-        } catch {}
+      if (treeResult.data === null) {
+        // 304 Not Modified — tree unchanged, no need to refresh branches either
+        if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+        const lastGlob = localStorage.getItem("gitsparse_last_glob") || "";
+        if (lastGlob) setGlobPattern(lastGlob);
+        const lastCheckedStr = localStorage.getItem("gitsparse_last_checked");
+        if (lastCheckedStr) {
+          try {
+            const paths = JSON.parse(lastCheckedStr);
+            if (Array.isArray(paths)) setCheckedPaths(new Set(paths));
+          } catch {}
+        }
+      } else {
+        // Tree changed — update tree AND refresh branches
+        const nodes = buildTreeStructure(treeResult.data.tree);
+        setRepoInfo({ owner: repo.owner, repo: repo.repo, branch: targetRef });
+        setTreeNodes(nodes);
+        if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+        localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
+        if (treeResult.etag) {
+          localStorage.setItem(etagKey, treeResult.etag);
+        }
+
+        // Refresh branches since tree changed (repo has new commits)
+        if (!hasCachedBranches) {
+          const branchResult = await dedupedFetch(
+            `branches:${repo.owner}:${repo.repo}`,
+            () => fetchRepoBranches(repo.owner, repo.repo)
+          ).catch(() => null);
+          if (branchResult) {
+            const branchNames = branchResult.data.map((b: {name: string}) => b.name);
+            setBranches(branchNames);
+            localStorage.setItem(branchesKey, JSON.stringify(branchNames));
+          }
+        }
+
+        // Re-apply glob pattern and checked paths after fresh fetch
+        const lastGlob = localStorage.getItem("gitsparse_last_glob") || "";
+        if (lastGlob) setGlobPattern(lastGlob);
+        const lastCheckedStr = localStorage.getItem("gitsparse_last_checked");
+        if (lastCheckedStr) {
+          try {
+            const paths = JSON.parse(lastCheckedStr);
+            if (Array.isArray(paths)) setCheckedPaths(new Set(paths));
+          } catch {}
+        }
       }
     } catch (err) {
       console.warn("Failed to auto-reload last session:", err);
@@ -180,14 +224,24 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [globPattern]);
 
-  const updateRateLimit = async (token?: string) => {
-    try {
-      const data = await fetchRateLimit(token);
-      setRateLimit(data.rate);
-    } catch (err) {
-      console.warn("Failed to fetch rate limit status:", err);
+  // Warn user when rate limit is low and no token is configured
+  useEffect(() => {
+    if (rateLimit && rateLimit.remaining < 10 && !hasToken) {
+      const warned = localStorage.getItem('gitsparse_low_limit_warned');
+      if (!warned) {
+        toast({
+          variant: "destructive",
+          title: t("main:low_limit_toast_title"),
+          description: t("main:low_limit_toast_desc", { remaining: rateLimit.remaining }),
+          duration: 8000,
+        });
+        localStorage.setItem('gitsparse_low_limit_warned', 'true');
+      }
     }
-  };
+    // Note: Token dialog auto-opens on 403 errors in handleRepoSubmit, not here.
+    // Rate-limit-based auto-open was removed because extractRateLimit() can
+    // return default (0) values when response headers are missing.
+  }, [rateLimit, hasToken]);
 
   const handleRepoSubmit = async (repo: RepoInfo) => {
     setLoading(true);
@@ -198,24 +252,41 @@ export default function App() {
     
     try {
       // 1. Fetch branches in parallel with tree
-      const branchList = await fetchRepoBranches(repo.owner, repo.repo).catch(() => []);
-      setBranches(branchList.map(b => b.name));
-      
+      const branchResult = await dedupedFetch(
+        `branches:${repo.owner}:${repo.repo}`,
+        () => fetchRepoBranches(repo.owner, repo.repo)
+      ).catch(() => null);
+      if (branchResult) {
+        const branchNames = branchResult.data.map(b => b.name);
+        setBranches(branchNames);
+        // Cache branches for future page loads
+        const branchesKey = `gitsparse_branches_${repo.owner}_${repo.repo}`;
+        localStorage.setItem(branchesKey, JSON.stringify(branchNames));
+        if (branchResult.rateLimit) setRateLimit(branchResult.rateLimit);
+      }
+
       const targetRef = refType === "commit" && commitSha.trim() ? commitSha.trim() : repo.branch;
       setCurrentRef(targetRef);
 
       // 2. Fetch tree
-      const treeData = await fetchRepoTree(repo.owner, repo.repo, targetRef);
-      const nodes = buildTreeStructure(treeData.tree);
-      
+      const treeResult = await dedupedFetch(
+        `tree:${repo.owner}:${repo.repo}:${targetRef}`,
+        () => fetchRepoTree(repo.owner, repo.repo, targetRef)
+      );
+      if (!treeResult.data) {
+        throw new Error("Failed to fetch repository tree");
+      }
+      const nodes = buildTreeStructure(treeResult.data.tree);
+
       setRepoInfo({
         owner: repo.owner,
         repo: repo.repo,
         branch: targetRef
       });
       setTreeNodes(nodes);
-      
-      // Save last session and tree to localStorage
+      if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+
+      // Save last session, tree and ETag to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
         owner: repo.owner,
         repo: repo.repo,
@@ -224,9 +295,11 @@ export default function App() {
         commitSha: refType === "commit" ? commitSha.trim() : ""
       }));
       localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
-      
-      // Update rate limits on success
-      updateRateLimit();
+      // Store ETag for conditional requests on next page load
+      if (treeResult.etag) {
+        const etagKey = `gitsparse_etag_${repo.owner}_${repo.repo}_${targetRef}`;
+        localStorage.setItem(etagKey, treeResult.etag);
+      }
       
       toast({
         title: t("main:toast_loaded_title"),
@@ -262,16 +335,23 @@ export default function App() {
     
     try {
       setCurrentRef(newBranch);
-      const treeData = await fetchRepoTree(repoInfo.owner, repoInfo.repo, newBranch);
-      const nodes = buildTreeStructure(treeData.tree);
-      
+      const treeResult = await dedupedFetch(
+        `tree:${repoInfo.owner}:${repoInfo.repo}:${newBranch}`,
+        () => fetchRepoTree(repoInfo.owner, repoInfo.repo, newBranch)
+      );
+      if (!treeResult.data) {
+        throw new Error("Failed to fetch branch tree");
+      }
+      const nodes = buildTreeStructure(treeResult.data.tree);
+
       setRepoInfo({
         ...repoInfo,
         branch: newBranch
       });
       setTreeNodes(nodes);
-      
-      // Save last session and tree to localStorage
+      if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+
+      // Save last session, tree and ETag to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
         owner: repoInfo.owner,
         repo: repoInfo.repo,
@@ -280,8 +360,10 @@ export default function App() {
         commitSha: ""
       }));
       localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
-      
-      updateRateLimit();
+      if (treeResult.etag) {
+        const etagKey = `gitsparse_etag_${repoInfo.owner}_${repoInfo.repo}_${newBranch}`;
+        localStorage.setItem(etagKey, treeResult.etag);
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -303,16 +385,23 @@ export default function App() {
     try {
       const sha = commitSha.trim();
       setCurrentRef(sha);
-      const treeData = await fetchRepoTree(repoInfo.owner, repoInfo.repo, sha);
-      const nodes = buildTreeStructure(treeData.tree);
-      
+      const treeResult = await dedupedFetch(
+        `tree:${repoInfo.owner}:${repoInfo.repo}:${sha}`,
+        () => fetchRepoTree(repoInfo.owner, repoInfo.repo, sha)
+      );
+      if (!treeResult.data) {
+        throw new Error("Failed to fetch commit tree");
+      }
+      const nodes = buildTreeStructure(treeResult.data.tree);
+
       setRepoInfo({
         ...repoInfo,
         branch: sha
       });
       setTreeNodes(nodes);
-      
-      // Save last session and tree to localStorage
+      if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+
+      // Save last session, tree and ETag to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
         owner: repoInfo.owner,
         repo: repoInfo.repo,
@@ -321,8 +410,10 @@ export default function App() {
         commitSha: sha
       }));
       localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
-      
-      updateRateLimit();
+      if (treeResult.etag) {
+        const etagKey = `gitsparse_etag_${repoInfo.owner}_${repoInfo.repo}_${sha}`;
+        localStorage.setItem(etagKey, treeResult.etag);
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -428,7 +519,7 @@ export default function App() {
 
   const handleTokenSave = (token: string) => {
     setHasToken(!!token);
-    updateRateLimit(token || undefined);
+    // Rate limit will be updated from the next API response headers
   };
 
   // Loading skeleton helper for IDE Tree View
@@ -478,7 +569,7 @@ export default function App() {
               className={`h-8 gap-1.5 transition-all text-xs border-border ${
                 hasToken
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-700 dark:hover:text-emerald-300"
-                  : "bg-transparent text-foreground hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/20"
+                  : "glowing-button bg-transparent text-foreground hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/20"
               }`}
             >
               <KeyRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
