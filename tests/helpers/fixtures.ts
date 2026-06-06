@@ -33,7 +33,12 @@ async function fulfillJson(
   await route.fulfill({
     status,
     contentType: "application/json",
-    headers,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers":
+        "ETag, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset",
+      ...headers,
+    },
     body: JSON.stringify(body),
   });
 }

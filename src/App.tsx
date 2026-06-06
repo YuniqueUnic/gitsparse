@@ -7,7 +7,7 @@ import { TokenDialog } from "@/components/TokenDialog";
 import { TipsDialog } from "@/components/TipsDialog";
 import { SuggestDialog } from "@/components/SuggestDialog";
 import { RepoInfo, TreeNode, RateLimit } from "@/lib/types";
-import { fetchRepoTree, buildTreeStructure, filterTree, fetchRepoBranches, getStoredToken, dedupedFetch } from "@/lib/github";
+import { fetchRepoTree, buildTreeStructure, filterTree, fetchRepoBranches, fetchRateLimit, getStoredToken, dedupedFetch } from "@/lib/github";
 import { KeyRound, Info, Database, Layers, CheckSquare, Square, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,60 @@ import { Toaster } from "@/components/ui/toaster";
 import { GithubIcon as GithubBrand } from "@/components/icons";
 import { useTranslation } from "@/components/I18nProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+
+const RATE_LIMIT_STORAGE_KEYS = {
+  authenticated: "gitsparse_last_rate_limit_auth",
+  anonymous: "gitsparse_last_rate_limit_anon",
+} as const;
+
+function getRateLimitStorageKey(isAuthenticated: boolean): string {
+  return isAuthenticated
+    ? RATE_LIMIT_STORAGE_KEYS.authenticated
+    : RATE_LIMIT_STORAGE_KEYS.anonymous;
+}
+
+function isRateLimit(value: unknown): value is RateLimit {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<RateLimit>;
+  return (
+    typeof candidate.limit === "number" &&
+    Number.isFinite(candidate.limit) &&
+    typeof candidate.remaining === "number" &&
+    Number.isFinite(candidate.remaining) &&
+    typeof candidate.reset === "number" &&
+    Number.isFinite(candidate.reset)
+  );
+}
+
+function readStoredRateLimit(isAuthenticated: boolean): RateLimit | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const storedValue = localStorage.getItem(getRateLimitStorageKey(isAuthenticated));
+  if (!storedValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(storedValue);
+    return isRateLimit(parsed) ? parsed : null;
+  } catch (error) {
+    console.warn("Failed to parse stored rate limit:", error);
+    return null;
+  }
+}
+
+function writeStoredRateLimit(rateLimit: RateLimit, isAuthenticated: boolean): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(getRateLimitStorageKey(isAuthenticated), JSON.stringify(rateLimit));
+}
 
 export default function App() {
   const [loading, setLoading] = useState(false);
@@ -54,6 +108,25 @@ export default function App() {
   // Mobile view: tab switcher between Tree and Preview panels
   const [mobileTab, setMobileTab] = useState<"tree" | "preview">("tree");
 
+  const applyRateLimit = (nextRateLimit: RateLimit | null, isAuthenticated: boolean) => {
+    setRateLimit(nextRateLimit);
+    if (nextRateLimit) {
+      writeStoredRateLimit(nextRateLimit, isAuthenticated);
+    }
+  };
+
+  const refreshRateLimitStatus = async (isAuthenticated: boolean) => {
+    try {
+      const status = await dedupedFetch(
+        `rate-limit-status:${isAuthenticated ? "auth" : "anon"}`,
+        () => fetchRateLimit()
+      );
+      applyRateLimit(status.resources?.core ?? status.rate, isAuthenticated);
+    } catch (error) {
+      console.warn("Failed to refresh rate limit status:", error);
+    }
+  };
+
   // Monitor checked files to prompt switching to Git Sparse Mode dynamically
   useEffect(() => {
     if (checkedPaths.size > 10 && downloadMode === "direct") {
@@ -67,17 +140,24 @@ export default function App() {
   // Restore last workspace on load to prevent excessive rate-limiting and redundant fetching
   useEffect(() => {
     const token = getStoredToken();
-    setHasToken(!!token);
+    const isAuthenticated = !!token;
+    const storedRateLimit = readStoredRateLimit(isAuthenticated);
+    setHasToken(isAuthenticated);
+    setRateLimit(storedRateLimit);
     // Note: Rate limit is obtained from API response headers (X-RateLimit-*),
     // no need to call /rate_limit endpoint on every page load.
 
     // Auto-restore last session
     const lastRepoStr = localStorage.getItem("gitsparse_last_repo");
+    const hasCachedTree = !!localStorage.getItem("gitsparse_last_tree");
+    if (!storedRateLimit && lastRepoStr && hasCachedTree) {
+      void refreshRateLimitStatus(isAuthenticated);
+    }
     if (lastRepoStr) {
       try {
         const lastRepo = JSON.parse(lastRepoStr);
         if (lastRepo && lastRepo.owner && lastRepo.repo) {
-          autoReloadLastSession(lastRepo, !!token);
+          autoReloadLastSession(lastRepo, isAuthenticated);
         }
       } catch (err) {
         console.warn("Failed to parse last session repo:", err);
@@ -159,7 +239,7 @@ export default function App() {
 
       if (treeResult.data === null) {
         // 304 Not Modified — tree unchanged, no need to refresh branches either
-        if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+        if (treeResult.rateLimit) applyRateLimit(treeResult.rateLimit, isAuthenticated);
         const lastGlob = localStorage.getItem("gitsparse_last_glob") || "";
         if (lastGlob) setGlobPattern(lastGlob);
         const lastCheckedStr = localStorage.getItem("gitsparse_last_checked");
@@ -174,7 +254,7 @@ export default function App() {
         const nodes = buildTreeStructure(treeResult.data.tree);
         setRepoInfo({ owner: repo.owner, repo: repo.repo, branch: targetRef });
         setTreeNodes(nodes);
-        if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+        if (treeResult.rateLimit) applyRateLimit(treeResult.rateLimit, isAuthenticated);
         localStorage.setItem("gitsparse_last_tree", JSON.stringify(nodes));
         if (treeResult.etag) {
           localStorage.setItem(etagKey, treeResult.etag);
@@ -258,6 +338,7 @@ export default function App() {
     setCheckedPaths(new Set());
     setGlobPattern("");
     setDebouncedGlob("");
+    const isAuthenticated = !!getStoredToken();
     
     try {
       // 1. Fetch branches in parallel with tree
@@ -271,7 +352,7 @@ export default function App() {
         // Cache branches for future page loads
         const branchesKey = `gitsparse_branches_${repo.owner}_${repo.repo}`;
         localStorage.setItem(branchesKey, JSON.stringify(branchNames));
-        if (branchResult.rateLimit) setRateLimit(branchResult.rateLimit);
+        if (branchResult.rateLimit) applyRateLimit(branchResult.rateLimit, isAuthenticated);
       }
 
       const targetRef = refType === "commit" && commitSha.trim() ? commitSha.trim() : repo.branch;
@@ -293,7 +374,7 @@ export default function App() {
         branch: targetRef
       });
       setTreeNodes(nodes);
-      if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+      if (treeResult.rateLimit) applyRateLimit(treeResult.rateLimit, isAuthenticated);
 
       // Save last session, tree and ETag to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
@@ -341,6 +422,7 @@ export default function App() {
     setLoading(true);
     setSelectedNode(null);
     setCheckedPaths(new Set());
+    const isAuthenticated = !!getStoredToken();
     
     try {
       setCurrentRef(newBranch);
@@ -358,7 +440,7 @@ export default function App() {
         branch: newBranch
       });
       setTreeNodes(nodes);
-      if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+      if (treeResult.rateLimit) applyRateLimit(treeResult.rateLimit, isAuthenticated);
 
       // Save last session, tree and ETag to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
@@ -390,6 +472,7 @@ export default function App() {
     setLoading(true);
     setSelectedNode(null);
     setCheckedPaths(new Set());
+    const isAuthenticated = !!getStoredToken();
     
     try {
       const sha = commitSha.trim();
@@ -408,7 +491,7 @@ export default function App() {
         branch: sha
       });
       setTreeNodes(nodes);
-      if (treeResult.rateLimit) setRateLimit(treeResult.rateLimit);
+      if (treeResult.rateLimit) applyRateLimit(treeResult.rateLimit, isAuthenticated);
 
       // Save last session, tree and ETag to localStorage
       localStorage.setItem("gitsparse_last_repo", JSON.stringify({
@@ -527,8 +610,13 @@ export default function App() {
   };
 
   const handleTokenSave = (token: string) => {
-    setHasToken(!!token);
-    // Rate limit will be updated from the next API response headers
+    const isAuthenticated = !!token;
+    const storedRateLimit = readStoredRateLimit(isAuthenticated);
+    setHasToken(isAuthenticated);
+    setRateLimit(storedRateLimit);
+    if (!storedRateLimit) {
+      void refreshRateLimitStatus(isAuthenticated);
+    }
   };
 
   // Loading skeleton helper for IDE Tree View
