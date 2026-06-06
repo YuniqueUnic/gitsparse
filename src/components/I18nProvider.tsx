@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 
 // Load namespace translations synchronously for zero-latency initial rendering
 import enCommon from "../locales/en/common.json";

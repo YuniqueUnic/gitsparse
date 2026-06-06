@@ -50,3 +50,4 @@ bun-debug.log*
 
 # TypeScript build info
 *.tsbuildinfo
+.ace-tool/

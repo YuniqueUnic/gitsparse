@@ -87,7 +87,7 @@ test.describe("Feature: GitHub 403 error triggers automatic Token dialog", () =>
 
     // When I load a repo successfully
     await loadRepo(page);
-    await page.waitForTimeout(800); // Wait for any async effects
+    await expect(page.locator("text=Workspace: test-owner/test-repo")).toBeVisible();
 
     // Then the Token dialog should NOT be open
     const tokenDialog = page.locator("div[role='dialog']");
@@ -106,7 +106,7 @@ test.describe("Feature: GitHub 403 error triggers automatic Token dialog", () =>
 
     // When I load a repo
     await loadRepo(page);
-    await page.waitForTimeout(1500);
+    await expect(page.locator("div[role='dialog']")).toBeVisible({ timeout: 6000 });
 
     // Then there should be no uncaught JS errors related to fetch/promise rejection
     const fetchErrors = uncaughtErrors.filter((e) => /Uncaught|fetch|promise/i.test(e));

@@ -13,6 +13,13 @@ test.describe("Session: Persistence, Branch/SHA Switching & Multi-Pattern Glob",
   test("TC-08: Verify workspace and state auto-restoration from localStorage on refresh", async ({
     page,
   }) => {
+    let githubApiRequestCount = 0;
+    page.on("request", (request) => {
+      if (request.url().startsWith("https://api.github.com/")) {
+        githubApiRequestCount += 1;
+      }
+    });
+
     await loadRepo(page);
     await expect(page.locator("text=src")).toBeVisible();
 
@@ -30,16 +37,18 @@ test.describe("Session: Persistence, Branch/SHA Switching & Multi-Pattern Glob",
     await globInput.fill("**/*.md");
 
     await expect(page.locator("text=Matches: 1 files")).toBeVisible();
+    expect(githubApiRequestCount).toBe(2);
 
     // Reload and verify state restoration
     await page.reload();
+    await page.waitForLoadState("networkidle");
 
     await expect(page.locator("input[placeholder*='owner/repository']")).toHaveValue(
       "test-owner/test-repo"
     );
-    await expect(page.locator("text=src").first()).toBeVisible();
     await expect(page.locator("text=docs").first()).toBeVisible();
     await expect(page.locator("input[placeholder*='Filter files']")).toHaveValue("**/*.md");
+    await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
 
     const restoredCheckbox = page
       .locator("div")
@@ -47,6 +56,7 @@ test.describe("Session: Persistence, Branch/SHA Switching & Multi-Pattern Glob",
       .locator("button[role='checkbox']")
       .first();
     await expect(restoredCheckbox).toHaveAttribute("data-state", "checked");
+    expect(githubApiRequestCount).toBe(2);
   });
 
   test("TC-09: Verify comma-separated multi-pattern Glob filtering", async ({ page }) => {

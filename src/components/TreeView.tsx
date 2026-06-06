@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { TreeNode, RepoInfo } from "@/lib/types";
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { getAllFiles } from "@/lib/github";
@@ -47,12 +46,25 @@ function TreeNodeComponent({
     }
   }, [node.isExpanded]);
 
-  const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const activateNode = () => {
     if (node.type === "tree" && hasChildren) {
-      setIsExpanded(!isExpanded);
+      setIsExpanded((expanded) => !expanded);
     }
     onNodeSelect(node, repoInfo);
+  };
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    activateNode();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter" && e.key !== " ") {
+      return;
+    }
+
+    e.preventDefault();
+    activateNode();
   };
 
   const getIcon = () => {
@@ -102,17 +114,20 @@ function TreeNodeComponent({
           isSelected && "bg-accent text-accent-foreground font-medium"
         )}
         onClick={handleToggle}
+        onKeyDown={handleKeyDown}
+        role="treeitem"
+        tabIndex={0}
+        aria-selected={isSelected}
+        aria-expanded={node.type === "tree" ? isExpanded : undefined}
         style={{ paddingLeft: `${depth * 14 + 4}px` }}
       >
         <div className="flex items-center gap-1 min-w-0 flex-1">
           {getChevron()}
-          <div
-            className="p-1 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="p-1 shrink-0">
             <Checkbox
               checked={isIndeterminate ? "indeterminate" : isChecked}
               onCheckedChange={(checked) => handleCheckboxChange(!!checked)}
+              onClick={(e) => e.stopPropagation()}
               className="h-4 w-4 rounded-sm border-muted-foreground/50 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
             />
           </div>
