@@ -77,7 +77,7 @@ export default function App() {
       try {
         const lastRepo = JSON.parse(lastRepoStr);
         if (lastRepo && lastRepo.owner && lastRepo.repo) {
-          autoReloadLastSession(lastRepo);
+          autoReloadLastSession(lastRepo, !!token);
         }
       } catch (err) {
         console.warn("Failed to parse last session repo:", err);
@@ -85,10 +85,11 @@ export default function App() {
     }
   }, []);
 
-  const autoReloadLastSession = async (repo: any) => {
+  const autoReloadLastSession = async (repo: any, isAuthenticated: boolean) => {
     // Step 1: Instantly restore tree from cache to avoid blank screen on refresh
     const cachedTreeStr = localStorage.getItem("gitsparse_last_tree");
     const targetRef = repo.branch || "main";
+    let hasCachedTree = false;
 
     if (repo.refType === "commit" && repo.commitSha) {
       setRefType("commit");
@@ -103,6 +104,7 @@ export default function App() {
       try {
         const cachedNodes = JSON.parse(cachedTreeStr);
         if (Array.isArray(cachedNodes) && cachedNodes.length > 0) {
+          hasCachedTree = true;
           setRepoInfo({ owner: repo.owner, repo: repo.repo, branch: targetRef });
           setTreeNodes(cachedNodes);
           // Restore glob and checked paths immediately from cache
@@ -131,6 +133,13 @@ export default function App() {
           setBranches(cachedBranches);
         }
       } catch {}
+    }
+
+    // Anonymous conditional requests still consume primary rate limit on GitHub.
+    // If we already have a cached tree, keep refresh fully offline until the user
+    // explicitly reloads the repo or adds a PAT.
+    if (hasCachedTree && !isAuthenticated) {
+      return;
     }
 
     // Step 3: Silently refetch in background
@@ -241,7 +250,7 @@ export default function App() {
     // Note: Token dialog auto-opens on 403 errors in handleRepoSubmit, not here.
     // Rate-limit-based auto-open was removed because extractRateLimit() can
     // return default (0) values when response headers are missing.
-  }, [rateLimit, hasToken]);
+  }, [rateLimit, hasToken, t, toast]);
 
   const handleRepoSubmit = async (repo: RepoInfo) => {
     setLoading(true);

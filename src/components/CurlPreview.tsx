@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Check, Download, Terminal, AlertCircle, File, Folder, BookOpen } from "lucide-react";
 import { TreeNode, RepoInfo } from "@/lib/types";
-import { downloadCommand, getAllFiles, generateDownloadScript, generateGitSparseScript } from "@/lib/github";
+import { getAllFiles, generateDownloadScript, generateGitSparseScript } from "@/lib/github";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "./I18nProvider";
 import { UsageTipsDialog } from "./UsageTipsDialog";

@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "react",
+    "jsx-a11y",
+    "node",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    ".agents/**",
+    "dist/**",
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**"
+  ],
+  "rules": {},
+  "env": {
+    "builtin": true
+  }
+}

@@ -328,11 +328,7 @@ echo "Downloading files to $OUTPUT_DIR..."
 
   for (const path of selectedPaths) {
     const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
-    const url = `https://raw.githubusercontent.com/\${owner}/\${repo}/refs/heads/\${branch}/\${path}`
-      .replace('\${owner}', encodeURIComponent(owner))
-      .replace('\${repo}', encodeURIComponent(repo))
-      .replace('\${branch}', encodeURIComponent(branch))
-      .replace('\${path}', encodedPath);
+    const url = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/refs/heads/${encodeURIComponent(branch)}/${encodedPath}`;
     
     if (tool === 'wget') {
       script += `mkdir -p "$OUTPUT_DIR/$(dirname "${path}")" && wget -O "$OUTPUT_DIR/${path}" "\${AUTH_HEADERS[@]}" "${url}"\n`;

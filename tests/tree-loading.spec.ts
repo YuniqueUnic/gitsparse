@@ -4,8 +4,10 @@
 import { test, expect, setupMocks, loadRepo } from "./helpers/fixtures";
 
 test.describe("Core: Repository Loading & File Tree", () => {
+  let githubApi: Awaited<ReturnType<typeof setupMocks>>;
+
   test.beforeEach(async ({ page }) => {
-    await setupMocks(page);
+    githubApi = await setupMocks(page);
     await page.goto("/");
     await page.evaluate(() => localStorage.clear());
   });
@@ -23,6 +25,12 @@ test.describe("Core: Repository Loading & File Tree", () => {
     // Click folder to expand
     await page.locator("text=docs").click();
     await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
+
+    expect(githubApi.requests).toEqual([
+      "/repos/test-owner/test-repo/branches",
+      "/repos/test-owner/test-repo/git/trees/main?recursive=1",
+    ]);
+    expect(githubApi.countRequests("/rate_limit")).toBe(0);
   });
 
   test("TC-02: Switch branch and reload the tree", async ({ page }) => {
@@ -37,6 +45,7 @@ test.describe("Core: Repository Loading & File Tree", () => {
 
     await expect(page.locator("text=dev-file.txt")).toBeVisible();
     await expect(page.locator("text=src")).not.toBeVisible();
+    expect(githubApi.countRequests("/repos/test-owner/test-repo/git/trees/dev?recursive=1")).toBe(1);
   });
 
   test("TC-03: Filter files using Glob matcher", async ({ page }) => {

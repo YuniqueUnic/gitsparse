@@ -1,6 +1,4 @@
 "use client";
-
-import * as React from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +8,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckSquare, Zap } from "lucide-react";
+import { AlertTriangle, Zap } from "lucide-react";
 import { useTranslation } from "./I18nProvider";
 
 export interface SuggestDialogProps {
