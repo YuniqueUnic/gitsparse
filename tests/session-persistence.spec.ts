@@ -22,6 +22,7 @@ test.describe("Session: Persistence, Branch/SHA Switching & Multi-Pattern Glob",
 
     await loadRepo(page);
     await expect(page.locator("text=src")).toBeVisible();
+    await expect(page.locator("footer")).toContainText("API Limit: 4997/5000");
 
     await page.locator("text=docs").click();
     await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
@@ -47,6 +48,7 @@ test.describe("Session: Persistence, Branch/SHA Switching & Multi-Pattern Glob",
       "test-owner/test-repo"
     );
     await expect(page.locator("text=docs").first()).toBeVisible();
+    await expect(page.locator("footer")).toContainText("API Limit: 4997/5000");
     await expect(page.locator("input[placeholder*='Filter files']")).toHaveValue("**/*.md");
     await expect(page.locator("span.truncate:has-text('README.md')").first()).toBeVisible();
 
@@ -57,6 +59,46 @@ test.describe("Session: Persistence, Branch/SHA Switching & Multi-Pattern Glob",
       .first();
     await expect(restoredCheckbox).toHaveAttribute("data-state", "checked");
     expect(githubApiRequestCount).toBe(2);
+  });
+
+  test("TC-08b: Verify legacy cached workspace refreshes quota status without refetching repo data", async ({
+    page,
+  }) => {
+    const githubRequests: string[] = [];
+    page.on("request", (request) => {
+      const url = request.url();
+      if (url.startsWith("https://api.github.com/")) {
+        const parsed = new URL(url);
+        githubRequests.push(`${parsed.pathname}${parsed.search}`);
+      }
+    });
+
+    await loadRepo(page);
+    await expect(page.locator("text=src")).toBeVisible();
+    await expect(page.locator("footer")).toContainText("API Limit: 4997/5000");
+
+    await page.evaluate(() => {
+      localStorage.removeItem("gitsparse_last_rate_limit_anon");
+    });
+
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator("input[placeholder*='owner/repository']")).toHaveValue(
+      "test-owner/test-repo"
+    );
+    await expect(page.locator("text=src")).toBeVisible();
+    await expect(page.locator("footer")).toContainText("API Limit: 4999/5000");
+
+    expect(githubRequests.filter((request) => request === "/rate_limit")).toHaveLength(1);
+    expect(
+      githubRequests.filter((request) => request === "/repos/test-owner/test-repo/branches")
+    ).toHaveLength(1);
+    expect(
+      githubRequests.filter(
+        (request) => request === "/repos/test-owner/test-repo/git/trees/main?recursive=1"
+      )
+    ).toHaveLength(1);
   });
 
   test("TC-09: Verify comma-separated multi-pattern Glob filtering", async ({ page }) => {
