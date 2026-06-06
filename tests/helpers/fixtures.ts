@@ -25,6 +25,11 @@ export async function setupMocks(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
+      headers: {
+        'X-RateLimit-Limit': '5000',
+        'X-RateLimit-Remaining': '4998',
+        'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 3600),
+      },
       body: JSON.stringify([{ name: "main" }, { name: "dev" }]),
     });
   });
@@ -36,6 +41,11 @@ export async function setupMocks(page: Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: {
+          'X-RateLimit-Limit': '5000',
+          'X-RateLimit-Remaining': '4997',
+          'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 3600),
+        },
         body: JSON.stringify({
           sha: "main-tree-sha",
           tree: [
@@ -68,6 +78,11 @@ export async function setupMocks(page: Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: {
+          'X-RateLimit-Limit': '5000',
+          'X-RateLimit-Remaining': '4996',
+          'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 3600),
+        },
         body: JSON.stringify({
           sha: "dev-tree-sha",
           tree: [{ path: "dev-file.txt", type: "blob", sha: "dev-f1", size: 500 }],
@@ -84,6 +99,11 @@ export async function setupMocks(page: Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: {
+          'X-RateLimit-Limit': '5000',
+          'X-RateLimit-Remaining': '4995',
+          'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 3600),
+        },
         body: JSON.stringify({
           sha: "abc1234",
           tree: [{ path: "sha-pinned-file.txt", type: "blob", sha: "sha-f1", size: 300 }],
@@ -109,13 +129,31 @@ export async function setup403Mocks(page: Page) {
   });
 
   await page.route("https://api.github.com/repos/test-owner/test-repo/branches", async (route) => {
-    await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      headers: {
+        'X-RateLimit-Limit': '60',
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 3600),
+      },
+      body: "{}"
+    });
   });
 
   await page.route(
     "https://api.github.com/repos/test-owner/test-repo/git/trees/main?recursive=1",
     async (route) => {
-      await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
+      await route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        headers: {
+          'X-RateLimit-Limit': '60',
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 3600),
+        },
+        body: "{}"
+      });
     }
   );
 }

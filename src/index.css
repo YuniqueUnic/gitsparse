@@ -79,3 +79,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes glowing-border {
+  0% {
+    border-color: #10b981;
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    border-color: #34d399;
+    box-shadow: 0 0 20px rgba(52, 211, 153, 0.5);
+  }
+  100% {
+    border-color: #10b981;
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.3);
+  }
+}
+
+.glowing-button {
+  animation: glowing-border 2s ease-in-out infinite;
+}

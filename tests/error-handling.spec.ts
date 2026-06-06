@@ -73,9 +73,9 @@ test.describe("Feature: GitHub 403 error triggers automatic Token dialog", () =>
     // When I load a repo
     await loadRepo(page);
 
-    // Then the toast title is in Chinese
-    const toast = page.locator("[data-state='open'][class*='destructive']").first();
-    await expect(toast).toContainText(/仓库|失败|Error/i, { timeout: 6000 });
+    // Then the toast should contain Chinese error guidance (match any destructive toast)
+    const toast = page.locator("[data-state='open'][class*='destructive']").filter({ hasText: /仓库|失败|Error|配额/i }).first();
+    await expect(toast).toBeVisible({ timeout: 6000 });
   });
 
   // -------------------------------------------------------------------------

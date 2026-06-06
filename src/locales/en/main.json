@@ -47,5 +47,7 @@
   "placeholder_branch_label": "branch",
   "toast_error_title": "Error Loading Repository",
   "toast_error_token_hint": "Click the key icon in the top-right to add your GitHub Personal Access Token.",
-  "mobile_preview_tab": "Preview"
+  "mobile_preview_tab": "Preview",
+  "low_limit_toast_title": "Rate Limit Running Low",
+  "low_limit_toast_desc": "Only {{remaining}} API requests left. Add a GitHub Token to avoid interruptions."
 }

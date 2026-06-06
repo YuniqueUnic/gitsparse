@@ -47,5 +47,7 @@
   "placeholder_branch_label": "分支",
   "toast_error_title": "仓库载入失败",
   "toast_error_token_hint": "请点击右上角密钥图标，添加您的 GitHub 个人访问令牌（PAT）。",
-  "mobile_preview_tab": "脚本预览"
+  "mobile_preview_tab": "脚本预览",
+  "low_limit_toast_title": "API 配额即将耗尽",
+  "low_limit_toast_desc": "仅剩 {{remaining}} 个 API 请求。添加 GitHub Token 以避免中断。"
 }
